@@ -1,0 +1,414 @@
+================================================================================
+  SYSTÈMES PVP — RÉFÉRENCE COMPLÈTE
+  M2922 | VRChat / UdonSharp
+================================================================================
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  A. GESTION DE LA MAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+A1. ÉQUIPES (TeamManager)
+─────────────────────────
+  · Nombre d'équipes configurable (2–16)
+  · Couleur, nom, statut actif par équipe
+  · Attribution manuelle ou auto-balance (équipe la moins peuplée)
+  · Détection du friendly fire (même équipe)
+  · Score par équipe (synced réseau)
+  · Compteur de joueurs par équipe (synced réseau)
+  · Équipe neutre / spectateur (TeamIndex = -1)
+  ↔ SpawnManager : les spawns sont filtrés par TeamIndex
+  ↔ HealthController : friendly fire check avant TakeDamage
+  ↔ PlayerController : SetTeam, UpdateTeamVisuals
+  ↔ GameMode : lecture des scores, détection du vainqueur
+
+A2. SPAWNS (SpawnManager + SpawnPoint)
+───────────────────────────────────────
+  · Points de spawn taggés par équipe
+  · Modes de sélection : aléatoire, séquentiel, le plus éloigné des ennemis
+  · Spawn protégé (invincibilité temporaire après respawn)
+  · Spawn initial (début de partie) vs respawn (mort en cours de partie)
+  · Spawn de véhicules / armes (points dédiés)
+  · Zones d'exclusion (ne pas spawner si joueur ennemi trop proche)
+  ↔ PlayerController : RespawnAtTeamSpawn()
+  ↔ GameMode : ForceRespawnAll() en début de manche
+  ↔ VehicleSpawner : spawn/respawn des véhicules aux points assignés
+
+A3. ZONES (TriggerZone)
+────────────────────────
+  · Zone de capture (Domination, King of the Hill)
+  · Zone de dégâts (lave, gaz, radiation — damage over time)
+  · Zone de soin (heal zone, base arrière)
+  · Zone de buff (vitesse, résistance)
+  · Zone de spawn protégée (invincibilité à l'intérieur)
+  · Zone hors-limites (damage + avertissement si joueur sort)
+  ↔ HealthController : TakeDamage / Heal depuis OnPlayerEnter/Stay/Exit
+  ↔ TeamManager : score incrémenté selon l'équipe en zone
+  ↔ EventBus : événements OnZoneCaptured, OnZoneContested
+
+A4. GAME MODE (GameModeController)
+───────────────────────────────────
+  · States : Waiting → Preparing → InProgress → Finished
+  · Score ou temps limite configurables
+  · Conditions de victoire : premier à X kills, capture de zones, survie, VIP
+  · Reset de map entre les manches (respawn des props, reset des scores)
+  · Timer synced réseau
+  · Annonces (début, fin, kill feed, objectif)
+  Modes standard :
+    - Free For All (FFA)
+    - Team Deathmatch (TDM)
+    - Domination (zones à capturer)
+    - King of the Hill (une zone)
+    - Capture The Flag (CTF)
+    - Search & Destroy (bombe)
+    - VIP / Escorte
+    - Battle Royale (zone qui rétrécit)
+  ↔ TeamManager : lecture scores, attribution équipes
+  ↔ SpawnManager : ForceRespawnAll, blocage respawn (modes S&D)
+  ↔ EventBus : écoute OnPlayerKilled, OnZoneCaptured, OnGameStateChanged
+
+A5. ROUND / MATCH MANAGER
+───────────────────────────
+  · Nombre de manches, meilleur sur N manches
+  · Intermission entre les manches
+  · Affichage du scoreboard
+  · Statistiques fin de partie (MVP, K/D, précision)
+  ↔ GameMode : écoute OnGameFinished
+  ↔ PlayerController : reset stats entre manches
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  B. PROPS & OBJETS DE MAP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+B1. PROP (M2922_Prop — base)
+─────────────────────────────
+  · Visuel activable/désactivable (_visualRoot)
+  · Colliders gérés (actifs/inactifs selon état)
+  · HealthController optionnel (prop destructible)
+  · Respawn automatique après délai configurable
+  · VFX de mort et de respawn
+  · Reset de transform au respawn
+  ↔ HealthController : TakeDamage, Respawn, Die
+  ↔ EventBus : OnPropDestroyed (custom event)
+
+B2. ARMES RAMASSABLES (M2922_WeaponProp → M2922_Prop)
+───────────────────────────────────────────────────────
+  · VRCPickup : ramassable, lâchable
+  · Tir raycast (semi-auto / full-auto)
+  · Gestion munitions + rechargement
+  · Retour à l'origine après drop (délai configurable)
+  · Arme désactivée si détruite (pickup = false)
+  · Headshot via HeadshotCollider
+  Types : Pistolet, Fusil, Fusil d'assaut, Sniper, Shotgun, SMG,
+           Fusil à pompe, Lance-grenades, Arme de mêlée
+  ↔ HealthController (cible) : TakeDamage + IsHeadshot
+  ↔ PlayerController (porteur) : ActiveWeapon, swap d'arme
+  ↔ EventBus : OnWeaponFired, OnWeaponEquipped, OnWeaponDropped
+
+B3. PROJECTILES (M2922_Projectile)
+────────────────────────────────────
+  · Physique réelle (Rigidbody, vitesse, gravité)
+  · Dégâts à l'impact (rayon d'explosion pour grenades/roquettes)
+  · Durée de vie maximale (auto-destruction)
+  · VFX : traîne, explosion, rebond
+  · Propriété du tireur (attacker ID)
+  · Pool d'objets pour les performances
+  ↔ HealthController (cible) : TakeDamage(Explosion)
+  ↔ WeaponProp : instanciation depuis le point de muzzle
+
+B4. OBJETS INTERACTABLES (M2922_InteractProp → M2922_Prop)
+────────────────────────────────────────────────────────────
+  · Bouton, levier, caisse, objectif
+  · VRC_Interactable : callback OnInteract
+  · État binaire ou à états multiples
+  · Synchronisé réseau
+  · Interaction réservée à une équipe (optionnel)
+  ↔ GameMode : activation/désactivation de zones, portes, objectifs
+  ↔ EventBus : OnObjectInteracted
+
+B5. OBJETS COLLECTABLES (PowerUp, Ammo, Soin)
+───────────────────────────────────────────────
+  · Disparaît au ramassage (respawn après délai)
+  · Effet immédiat (Heal, AddAmmo, ApplyBuff)
+  · Réservé à une équipe (optionnel)
+  · Attraction visuelle (rotation, glow)
+  ↔ HealthController : Heal()
+  ↔ WeaponProp : AddAmmo()
+  ↔ BuffSystem : ApplyBuff()
+
+B6. VÉHICULES (M2922_Vehicle → M2922_Prop)
+────────────────────────────────────────────
+  · Sièges multiples (pilote + passagers)
+  · HealthController propre (détruit si HP = 0)
+  · Armement monté (tourelle, missile)
+  · Exposition des passagers (dégâts si pas de protection)
+  · Physique véhicule (Rigidbody, moteur, direction)
+  · VRCStation pour les joueurs
+  ↔ HealthController (véhicule) : TakeDamage, Die → éjecte les occupants
+  ↔ PlayerController (occupant) : état InVehicle, dégâts transmis
+  ↔ SpawnManager : points de spawn véhicule dédiés
+  ↔ EventBus : OnVehicleDestroyed, OnPlayerEnterVehicle
+
+B7. STRUCTURES DESTRUCTIBLES (Mur, Porte, Pont)
+─────────────────────────────────────────────────
+  · Hérite de M2922_Prop
+  · Plusieurs états visuels (intact, endommagé, détruit)
+  · Peut bloquer ou ouvrir un passage selon son état
+  · Réparable (Heal sur HealthController)
+  ↔ GameMode : peut conditionner l'accès à une zone
+  ↔ EventBus : OnStructureDestroyed
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  C. JOUEURS & NPC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+C1. SANTÉ (M2922_HealthController)
+────────────────────────────────────
+  · HP actuels / max (synced)
+  · Régénération automatique (délai + vitesse)
+  · Invincibilité temporaire (spawn protection)
+  · Multiplicateur de dégâts par zone (headshot, crit)
+  · Résistances par type de dégât (bullet, explosion, melee…)
+  · État : Alive / Dead / Dying (animation de mort)
+  · Respawn automatique ou manuel
+  · Historique des dégâts (dernier attaquant, type, temps)
+  ↔ PlayerController : OnDamaged, OnDied, SetTeam
+  ↔ EventBus : OnPlayerKilled, OnPlayerDied, OnPlayerDamaged, OnPlayerHealed
+  ↔ TeamManager : vérification friendly fire avant TakeDamage
+
+C2. HIT ZONES (M2922_HitZone)
+───────────────────────────────
+  · Colliders par zone anatomique sur le joueur/NPC
+  · Multiplicateur de dégâts par zone :
+      - Corps       : ×1.0 (dégâts normaux)
+      - Tête        : ×2.0–×3.0 (headshot)
+      - Zone critique : ×1.5 (ex: dos, cou)
+      - Membres     : ×0.75 (bras, jambes)
+      - Armure      : ×0.5 (zones protégées)
+  · Transmission vers HealthController avec le bon multiplicateur
+  · Support d'armure par zone (absorption de dégâts)
+  ↔ HealthController : TakeDamage(dmg * multiplier, ...)
+  ↔ ArmorSystem : vérifier l'armure de la zone avant transmission
+
+C3. RÉSISTANCES & TYPES DE DÉGÂTS
+────────────────────────────────────
+  Types de dégâts :
+    Generic, Bullet, Melee, Explosion, Fire, Poison, Fall, Zone, Electric
+  Résistances (par entité, par armure) :
+    · float[DamageType] : 0 = aucune résistance, 1 = immunité
+    · Ex: NPC lourd : Bullet ×0.5, Explosion ×0.25, Melee ×0.1
+  Application : damage_final = damage * (1 - resistance[damageType])
+  ↔ HealthController : appliqué dans TakeDamage avant modification des HP
+
+C4. BUFFS & DEBUFFS (BuffSystem)
+──────────────────────────────────
+  Types :
+    · SpeedBoost, SlowDown
+    · ShieldRegen, HealthRegen
+    · DamageBoost, DamageReduction
+    · Invincibility (spawn protection)
+    · Invisibility (stealth)
+    · Poison, Burn, Stun
+  Propriétés par buff :
+    · Durée (secondes)
+    · Magnitude (valeur du modificateur)
+    · Stackable ou non
+    · Source (joueur, zone, objet)
+  ↔ HealthController : résistances modifiées, regen modifiée
+  ↔ PlayerController : vitesse de mouvement modifiée
+  ↔ EventBus : OnBuffApplied, OnBuffExpired
+
+C5. INVENTAIRE (InventorySystem)
+──────────────────────────────────
+  · Slots d'armes (ex: primaire, secondaire, mêlée, grenade)
+  · Slots d'équipement (armure, casque, gilet)
+  · Slots consommables (soin, boost, grenade fumigène)
+  · Limite de poids / nombre de slots
+  · Échange d'objets entre joueurs
+  · Drop à la mort (objets tombent au sol sous forme de pickups)
+  ↔ WeaponProp : OnPickup → ajout à l'inventaire, OnDrop → retrait
+  ↔ HealthController : appliquer armure sur TakeDamage
+  ↔ EventBus : OnItemPickedUp, OnItemDropped
+
+C6. ARMURE (ArmorSystem)
+──────────────────────────
+  · Points d'armure par zone ou globaux
+  · Absorption des dégâts (avant HealthController)
+  · Dégradation : l'armure perd des points à chaque coup
+  · Types : Légère / Lourde / Anti-explosion
+  · Réparable (via PowerUp ou station de réparation)
+  ↔ HitZone : consultation avant transmission à HealthController
+  ↔ InventorySystem : slot armure
+  ↔ EventBus : OnArmorBroken, OnArmorDamaged
+
+C7. CONTRÔLEUR JOUEUR (M2922_PlayerController)
+─────────────────────────────────────────────────
+  · Attribution d'équipe au join
+  · Gestion du respawn (SpawnManager)
+  · Team visuals (couleur matériau, indicateur)
+  · Statistiques : kills, deaths, assists, score
+  · Abonnement aux événements (OnPlayerKilled, OnGameStarted…)
+  · État : Alive / Dead / Spectating / InVehicle
+  ↔ HealthController : callback OnDamaged, OnDied
+  ↔ TeamManager : AssignPlayerAutoBalance, GetTeamColor
+  ↔ SpawnManager : RespawnAtTeamSpawn
+  ↔ InventorySystem : gestion des armes ramassées
+  ↔ EventBus : publication des événements joueur
+
+C8. NPC (M2922_NpcController → M2922_Base)
+────────────────────────────────────────────
+  · IA simple : patrouille, détection, attaque, mort
+  · HealthController propre (même système que joueur)
+  · HitZones partagées (headshot, zones critiques)
+  · Comportements : Idle / Patrol / Alert / Chase / Attack / Dead
+  · Équipe assignable (ennemi, allié, neutre)
+  · Loot à la mort (drop d'objets)
+  ↔ HealthController : TakeDamage, Die, Respawn
+  ↔ TeamManager : vérification équipe avant attaque
+  ↔ EventBus : OnNpcKilled, OnNpcAlert
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  D. SYSTÈMES TRANSVERSAUX
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+D1. EVENTBUS (M2922_EventBus)
+───────────────────────────────
+  · Système pub/sub pour découpler tous les modules
+  · Pool de EventData (ring buffer synchronisé)
+  · Publish local et Publish réseau (PublishNetwork)
+  Liste d'événements clés :
+    OnPlayerKilled      OnPlayerDied        OnPlayerDamaged
+    OnPlayerHealed      OnPlayerRespawned   OnTeamChanged
+    OnGameStarted       OnGameFinished      OnGameStateChanged
+    OnWeaponFired       OnWeaponEquipped    OnWeaponDropped
+    OnWeaponReloaded    OnZoneCaptured      OnZoneContested
+    OnPropDestroyed     OnVehicleDestroyed  OnBuffApplied
+    OnItemPickedUp      OnNpcKilled         OnScoreChanged
+
+D2. SCORING (ScoringSystem)
+─────────────────────────────
+  · Points par action : kill, assist, capture, défense, destroy véhicule...
+  · Multiplicateurs : killstreak, headshot, longue distance
+  · Classement joueurs et équipes
+  · Récompenses de killstreak (Scorestreak) :
+      ex: UAV, frappe aérienne, soin d'équipe, véhicule bonus
+  ↔ EventBus : écoute tous les événements → incrémente scores
+  ↔ TeamManager : AddTeamScore
+  ↔ GameMode : condition de victoire (score limit)
+
+D3. KILLSTREAKS / SCORESTREAKS
+────────────────────────────────
+  · Compteur de kills sans mourir par joueur
+  · Récompenses échelonnées (3 kills, 5 kills, 7 kills…)
+  · Réinitialisation à la mort
+  ↔ PlayerController : compteur killstreak
+  ↔ ScoringSystem : attribution des récompenses
+  ↔ EventBus : écoute OnPlayerKilled pour incrémenter
+
+D4. KILL FEED & HUD
+─────────────────────
+  · Affichage des kills récents (nom attaquant → nom victime + icône arme)
+  · Annonce headshot, killstreak, capture d'objectif
+  · Health bar locale (HP actuels / max)
+  · Indicateur d'équipe (couleur, nom)
+  · Indicateur de dégâts reçus (direction)
+  · Minimape / radar (positions alliés)
+  ↔ EventBus : écoute OnPlayerKilled, OnPlayerDamaged
+  ↔ HealthController : lecture Health pour la health bar
+
+D5. RÉSEAU & SYNCHRONISATION
+──────────────────────────────
+  · BehaviourSyncMode.Manual sur tous les scripts critiques
+  · RequestSerialization() après chaque état modifié
+  · OnDeserialization() pour réagir aux changements réseau
+  · Ownership transfer (véhicules, objets physiques)
+  · Late Joiner : synchronisation de l'état de la partie pour les arrivées tardives
+  ↔ GameMode : sync du timer et du state
+  ↔ TeamManager : sync des scores et compteurs
+  ↔ WeaponProp : sync ammo et état pickup
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  E. TABLEAU DES INTERACTIONS INTER-SYSTÈMES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Scénario "Joueur A tire sur Joueur B"
+  ──────────────────────────────────────
+  1. WeaponProp.TryFire() → Raycast → touche HitZone de B
+  2. HitZone → calcule multiplicateur (body/head/crit)
+  3. ArmorSystem de B → absorbe une partie des dégâts
+  4. TeamManager → check friendly fire (même équipe ?)
+  5. HealthController.TakeDamage(dmg_final, attackerId, DamageType.Bullet)
+  6. Résistances de B → réduction supplémentaire
+  7. HP de B mis à jour → RequestSerialization()
+  8. EventBus.OnPlayerDamaged publié
+  9. Si HP <= 0 → HealthController.Die() → EventBus.OnPlayerDied + OnPlayerKilled
+ 10. PlayerController de A → kills++, score++
+ 11. ScoringSystem → killstreak check, scorestreak ?
+ 12. KillFeed mis à jour
+ 13. PlayerController de B → deaths++, StartRespawnTimer
+ 14. SpawnManager → GetRandomTeamSpawn(B.TeamIndex)
+ 15. EventBus.OnPlayerRespawned → PlayerController.OnPlayerRespawned()
+
+  Scénario "Capture de zone"
+  ───────────────────────────
+  1. TriggerZone → OnPlayerEnter : joueur A entre dans la zone
+  2. TriggerZone → calcule l'équipe dominante (plus de joueurs dans la zone)
+  3. Si équipe dominante ≠ équipe actuelle : début de capture (timer)
+  4. Si ennemi entre → zone contestée
+  5. Timer terminé → TeamManager.AddTeamScore(equipe, points)
+  6. EventBus.OnZoneCaptured → GameMode check condition victoire
+  7. Si score >= score_limit → GameMode → GameFinished → RoundManager
+
+  Scénario "Destruction d'un véhicule"
+  ──────────────────────────────────────
+  1. WeaponProp tire → touche HitZone du véhicule
+  2. HealthController (véhicule).TakeDamage()
+  3. HP véhicule <= 0 → Vehicle.OnPropDied() → éjecte les occupants
+  4. EventBus.OnVehicleDestroyed
+  5. ScoringSystem → bonus points à l'attaquant
+  6. PlayerController (éjecté) → peut prendre dégâts de chute
+  7. Vehicle.RespawnProp() après délai → retour au spawn véhicule
+
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  F. PRIORITÉ D'IMPLÉMENTATION (suggestion)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  PHASE 1 — CŒUR DU SYSTÈME (✅ déjà en place)
+    [✅] M2922_Base, M2922_Manager, EventBus, EventData
+    [✅] HealthController (HP, TakeDamage, Die, Respawn)
+    [✅] TeamManager (équipes, scores, friendly fire)
+    [✅] SpawnManager + SpawnPoint
+    [✅] PlayerController (équipe, respawn, stats)
+    [✅] M2922_Prop (base props)
+    [✅] M2922_WeaponProp (arme ramassable, tir, ammo)
+
+  PHASE 2 — COMBAT ÉLABORÉ
+    [ ] HitZone (colliders par zone, multiplicateurs)
+    [ ] ArmorSystem (absorption, dégradation)
+    [ ] ResistanceSystem (par type de dégât)
+    [ ] Projectile physique (grenade, roquette)
+    [ ] BuffSystem (speed, shield, poison...)
+    [ ] InteractProp (bouton, levier, objectif)
+
+  PHASE 3 — GAME MODES & META
+    [ ] GameModeController (states, timer, conditions victoire)
+    [ ] TriggerZone (damage, heal, capture)
+    [ ] ScoringSystem (points, kills, assists)
+    [ ] KillstreakSystem
+    [ ] RoundManager (manches, scoreboard)
+    [ ] KillFeed / HUD
+
+  PHASE 4 — CONTENU AVANCÉ
+    [ ] InventorySystem (slots, swap)
+    [ ] VehicleSystem
+    [ ] NpcController (IA)
+    [ ] StructureDestructible
+    [ ] LootSystem (drop à la mort)
+    [ ] Collectable (powerup, ammo pack)
+
+================================================================================
