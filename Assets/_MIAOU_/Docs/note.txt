@@ -1,0 +1,81 @@
+bon tien voici la liste normalement complètes choses le pitch: 
+
+	les arme doivent flottée et n'avoir aucune colision
+
+	Holster / en forme de tic tac autour du joueur permetant de placer des 
+	arme ou objet n'importe ou autour du joueur  " nombre d'objet max réglable sur unity "
+
+	 convertir le script de holster  en box atachable sur n'importe qu'elle prefab
+  permetant le transport de gros objet ou 
+  le stockage d'objet en particulier dans une base par exemple
+               nombre d'objet max par holster Box réglable sur unity
+
+	script qui si rajouter sur n'importe qu'elle objet sur unity 
+	permet de le porter dans sont holster personnelle ou les BOX holster 
+
+value :de vie pour les joueur 
+
+Arme
+	Value Unity : qui définit le nombre de cartouche max par chargeur
+	Value Unity : qui défini le pourcentage de dégat du projectile 
+	Value Unity : qui défini la cadance de tire 
+	Value Unity : permetant de changer la longueur de la trajectoire en cloche de la balle 
+
+
+    TROIS TYPE DE PROJECTILE :   
+    Explosif , Classique , et flamme 
+
+  PS: le projectile doit être compatible avec les barre de vie des vehicule SaccFlight
+      et de même pour les projectile saccflight qui doivent manger la barre de vie des joueur
+
+	"le lance flamme se résume juste a un gros tic tac devant l'arme 
+	avec des particule blanche changeable en forme de jet"
+
+	" l'explosif se résume a une balle classique qui quand il touche 
+	le sol explose " 
+
+	" le classique se résume juste a une balle prenant une trajectoire de cloche "
+
+
+
+  Comportement des armes : 
+
+	prise a 2 mains ou une main toggle able sur le script "WEAPON" 
+		Option 1/2 , armes de poings , armes longues
+
+	Sur le script " WEAPON " Pointer l'objet arme vers le bas la fait recharger
+	
+	une option Sur le script " WEAPON " sur unity peut permettre 
+	l'ajout d'un scope pour les sniper + smoothing des mouvement 
+
+	sur le script " WEAPON" si l'arme frappe un objet contenant le script " CASSABLE " 
+	l'objet casse au bout d'un nombre de coup indiquée dans l'objet frappée
+
+	script " CASSABLE " qui casse l'objet ou le fait exploser si l'arme tirre dessus ou recois un 
+	nombre de coup indiquée sur unity par une n'importe qu'elle arme
+
+
+Explosif : 
+	une grenade qui une fois la gachette cliquée la dégoupille et laisse 3 seconde a sont porteur
+	avant d'exploser 
+
+	une bombe qui une fois armorcée et posée explose sur 200m et fait explosée tout objet 
+	contenant le script " CASSABLE " dans sont champ d'action et peut être désamorcée via un simple
+	click de gachette 
+
+
+Système de team : 
+	bouton au spawn qui défini la team du joueur :Visiteur , Resistant , Civil , Militaire
+	si le joueur choisi une option il et assignée a cette option et cela indique 
+	sont modèle l'orsqu'il meurt et l'endroit ou il vas respawn l'ors de sa mort
+	" medicbay civil , militaire , ou resistant "
+
+	Si le joueur se tp au spawn une triggerbox reset sa value de team a visiteur
+
+Mort : 
+
+	si le joueur si il meur un modèle mort corespondant a sa team aparaitra a ses coordonée 
+	, puis il sera tp a selon l'objet " medicbay " correspondant a sa team 
+		" le cadavre disparait au bout de 30 minutes "
+	 
+	si le joueur meurs ses arme/explosif sont automatiquement suprimée au bout de 30 minutes
