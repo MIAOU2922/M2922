@@ -5,96 +5,110 @@ using M2922.Core;
 
 namespace M2922.Combat
 {
-    /// <summary>
-    /// Système d'armure optionnel — absorbe une partie des dégâts AVANT HealthController.
-    ///
-    /// PIPELINE :
-    ///   Source → [FF check] → [Buff DamageIn] → ArmorSystem.AbsorbDamage() → HealthController
-    ///
-    /// L'armure est un pool plat unique. Le multiplicateur de zone (tête, corps…)
-    /// est géré par M2922_HitZone via _damageMultiplier — pas ici.
-    /// </summary>
-    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class M2922_ArmorSystem : M2922_Base
+    public class M2922_ArmorSystem : M2922_System
     {
-        [Header("=== ARMURE ===")]
-        [Tooltip("Points d'armure maximum.")]
-        [SerializeField] private float _maxArmor = 100f;
-        
-        [Tooltip("Part des dégâts absorbée par l'armure (0=aucune, 1=totale).")]
+        // === IArmored (inline) ===
+        [Header("=== ARMOR SETTINGS ===")]
+        [SerializeField] private float _baseMaxArmorPoints = 100f;
+
+        [Tooltip("Absorption de base (0-1)")]
         [Range(0f, 1f)]
-        [SerializeField] private float _absorptionRate = 0.75f;
+        [SerializeField] private float _absorption = 0.5f;
 
-        [Header("=== RÉSISTANCES ===")]
-        [Tooltip("Résistance aux balles (1=normale, 0=inutile).")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _bulletResistance = 1f;
+        [Tooltip("Multiplicateur d'absorption par type de dégât (ordre: Generic, Bullet, Explosion, Melee, Fire, Energy, Fall)\n" +
+                 "1.0 = normal | 0.0 = aucune absorption | 2.0 = double résistance")]
+        [SerializeField] private float[] _damageTypeResistance = { 1f, 1f, 1f, 1f, 1f, 1f, 1f };
 
-        [Tooltip("Résistance aux explosions.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _explosionResistance = 0.5f;
+        private float _maxArmorPoints;  // effective — modifiable par buffs/systèmes
+        private float _armorPoints;
 
-        [Tooltip("Résistance au corps à corps.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _meleeResistance = 0.1f;
+        public float ArmorPoints    => _armorPoints;
+        public float MaxArmorPoints => _maxArmorPoints;
+        public bool HasArmor        => _armorPoints > 0f;
 
-        [Tooltip("Résistance au feu / brûlures.")]
-        [Range(0f, 1f)]
-        [SerializeField] private float _fireResistance = 0.25f;
-
-        private float _armor;
-
-        // === LIFECYCLE ===
-
-        private void Start() => RepairFull();
-
-        // === ÉTAT ===
-
-        public float ArmorPoints    => _armor;
-        public float MaxArmorPoints => _maxArmor;
-        public bool  HasArmor       => _armor > 0f;
-
-        // === PIPELINE ===
-
-        /// <summary>
-        /// Absorbe une partie des dégâts. Réduit le pool d'armure en conséquence.
-        /// Retourne les dégâts résiduels à transmettre au HealthController.
-        /// </summary>
-        public float AbsorbDamage(float incomingDamage, DamageType damageType)
+        public void SetResistance(DamageType damageType, float multiplier)
         {
-            if (incomingDamage <= 0f || _armor <= 0f) return incomingDamage;
-
-            float resistance = GetResistanceForType(damageType);
-            float absorbed   = incomingDamage * _absorptionRate * resistance;
-            absorbed = Mathf.Min(absorbed, _armor);
-
-            // L'armure se détériore proportionnellement à sa résistance
-            _armor = Mathf.Max(0f, _armor - absorbed / Mathf.Max(0.01f, resistance));
-
-            return Mathf.Max(0f, incomingDamage - absorbed);
+            int idx = (int)damageType;
+            if (idx < 0 || idx >= _damageTypeResistance.Length) return;
+            _damageTypeResistance[idx] = Mathf.Max(0f, multiplier);
+            this.VerboseLog($"SetResistance: {damageType} = {_damageTypeResistance[idx]}");
         }
 
-        // === RÉPARATION ===
+        private float GetEffectiveAbsorption(DamageType damageType)
+        {
+            int idx = (int)damageType;
+            float resistance = (idx >= 0 && idx < _damageTypeResistance.Length) ? _damageTypeResistance[idx] : 1f;
+            return Mathf.Clamp01(_absorption * resistance);
+        }
+
+        public void SetMaxArmorPoints(float newMax)
+        {
+            float ratio = _maxArmorPoints > 0f ? _armorPoints / _maxArmorPoints : 1f;
+            _maxArmorPoints = Mathf.Max(0f, newMax);
+            _armorPoints = _maxArmorPoints * ratio;  // conserve le % d'armure restant
+            this.VerboseLog($"SetMaxArmorPoints: {_maxArmorPoints} | Armor: {_armorPoints}");
+        }
+
+        public void ResetMaxArmorPoints()
+        {
+            SetMaxArmorPoints(_baseMaxArmorPoints);
+        }
+
+        public float AbsorbDamage(float incomingDamage, DamageType damageType)
+        {
+            if (!HasArmor) return incomingDamage;
+            float effectiveAbsorption = GetEffectiveAbsorption(damageType);
+            float absorbed = Mathf.Min(_armorPoints, incomingDamage * effectiveAbsorption);
+            _armorPoints -= absorbed;
+            this.VerboseLog($"AbsorbDamage: absorbed {absorbed} ({damageType}, x{effectiveAbsorption}) | Armor: {_armorPoints}/{_maxArmorPoints}");
+            return incomingDamage - absorbed;
+        }
 
         public void RepairArmor(float amount)
         {
-            if (amount > 0f) _armor = Mathf.Min(_maxArmor, _armor + amount);
+            _armorPoints = Mathf.Min(_maxArmorPoints, _armorPoints + amount);
+            this.VerboseLog($"RepairArmor: +{amount} | Armor: {_armorPoints}/{_maxArmorPoints}");
         }
 
-        public void RepairFull() => _armor = _maxArmor;
-
-        // === HELPERS ===
-
-        private float GetResistanceForType(DamageType type)
+        public void RepairFull()
         {
-            switch (type)
-            {
-                case DamageType.Bullet:    return _bulletResistance;
-                case DamageType.Explosion: return _explosionResistance;
-                case DamageType.Melee:     return _meleeResistance;
-                case DamageType.Fire:      return _fireResistance;
-                default:                   return 1f;
-            }
+            _armorPoints = _maxArmorPoints;
+            this.VerboseLog($"RepairFull | Armor: {_armorPoints}/{_maxArmorPoints}");
         }
+
+        // === METHODE ===
+        protected override void Awake()
+        {
+            _maxArmorPoints = _baseMaxArmorPoints;
+            _armorPoints = _maxArmorPoints;
+        }
+
+        protected override void Start()
+        {
+            base.Start();
+        }
+
+#if !COMPILER_UDONSHARP && UNITY_EDITOR
+        protected override void OnValidate()
+        {
+            base.OnValidate();
+        }
+        protected override void OnDrawGizmos()
+        {
+            base.OnDrawGizmos();
+            if (!_showGizmo) return;
+            // Offset slot 8x — au-dessus du label Health (6x)
+            string status = HasArmor ? $"AP: {_armorPoints:F0}/{_maxArmorPoints:F0}" : "AP: NONE";
+            UnityEditor.Handles.Label(
+                transform.position + Vector3.up * (_gizmoSize * 8f),
+                $"[Armor] {status} | Abs: {(_absorption * 100f):F0}%"
+            );
+        }
+        protected override void OnDrawGizmosSelected()
+        {
+            base.OnDrawGizmosSelected();
+            if (!_showGizmo) return;
+        }
+#endif
     }
 }

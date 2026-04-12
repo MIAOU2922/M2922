@@ -13,6 +13,7 @@ using System.Buffers;
 
 namespace M2922.Core
 {
+    // Classe de base pour tous les composants M2922
     public class M2922_Base : UdonSharpBehaviour
     {
         [Header("=== GLOBAL DEBUG ===")]
@@ -21,15 +22,23 @@ namespace M2922.Core
 
         [Header("=== MANAGER REFERENCE ===")]
         public M2922_Manager Manager;
+
+        [Header("=== VISUAL DEBUG ===")]
+        [Tooltip("Afficher les infos de l'entité dans l'éditeur")]
+        [SerializeField] protected bool _showGizmo = true;
+        
+        [Tooltip("Couleur du gizmo")]
+        [SerializeField] protected Color _gizmoColor = Color.green;
+        
+        [Tooltip("Taille du gizmo")]
+        [SerializeField] protected float _gizmoSize = 0.5f;
         
         //methodes
         // recherche le manager dans la scene
         private void TryFindManager()
         {
-            GameObject _ManagerObj = GameObject.Find("Manager");
-            if (_ManagerObj == null) return;
-            Manager = _ManagerObj.GetComponent<M2922_Manager>();
-            if (Manager == null) return;
+            GameObject _Obj = GameObject.Find("Manager");
+            if (_Obj != null) Manager = _Obj.GetComponent<M2922_Manager>();
         }
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
 
@@ -39,7 +48,19 @@ namespace M2922.Core
             if (Manager == null) TryFindManager();
             SetDebugFlags();
         }
+        
+        // gizmos
+        protected virtual void OnDrawGizmos() {
+            if (!_showGizmo) return;
+        }
+        protected virtual void OnDrawGizmosSelected() {
+            if (!_showGizmo) return;
+        }
+
+
 #endif
+        protected virtual void Awake() { }
+
         protected virtual void Start()
         {
             if (Manager == null) TryFindManager();

@@ -20,17 +20,7 @@ namespace M2922.Spawning
         
         [Tooltip("Ce spawn est-il actuellement actif?")]
         [SerializeField] private bool _isActive = true;
-        
-        [Header("=== VISUAL DEBUG ===")]
-        [Tooltip("Afficher la direction du spawn dans l'éditeur")]
-        [SerializeField] private bool _showGizmo = true;
-        
-        [Tooltip("Couleur du gizmo")]
-        [SerializeField] private Color _gizmoColor = Color.green;
-        
-        [Tooltip("Taille du gizmo")]
-        [SerializeField] private float _gizmoSize = 0.5f;
-        
+
         // === PROPERTIES ===
         public int TeamIndex => _teamIndex;
         public int Priority => _priority;
@@ -86,10 +76,10 @@ namespace M2922.Spawning
         // === DEBUG VISUALIZATION ===
         
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
-        private void OnDrawGizmos()
+        protected override void OnDrawGizmos()
         {
+            base.OnDrawGizmos();
             if (!_showGizmo) return;
-            
             // Dessiner la position
             Gizmos.color = _isActive ? _gizmoColor : Color.gray;
             Gizmos.DrawWireSphere(transform.position, _gizmoSize);
@@ -109,21 +99,21 @@ namespace M2922.Spawning
             
             Gizmos.DrawLine(end, arrowPoint1);
             Gizmos.DrawLine(end, arrowPoint2);
-        }
-        
-        private void OnDrawGizmosSelected()
-        {
-            if (!_showGizmo) return;
-            
-            // Afficher une zone plus large quand sélectionné
-            Gizmos.color = new Color(_gizmoColor.r, _gizmoColor.g, _gizmoColor.b, 0.2f);
-            Gizmos.DrawSphere(transform.position, _gizmoSize * 2f);
-            
+
             // Afficher les infos
             UnityEditor.Handles.Label(
                 transform.position + Vector3.up * (_gizmoSize * 3f),
                 $"Spawn Point\nTeam: {(_teamIndex >= 0 ? _teamIndex.ToString() : "FFA")}\nPriority: {_priority}"
             );
+        }
+        
+        protected override void OnDrawGizmosSelected()
+        {
+            base.OnDrawGizmosSelected();
+            if (!_showGizmo) return;
+            // Afficher une zone plus large quand sélectionné
+            Gizmos.color = new Color(_gizmoColor.r, _gizmoColor.g, _gizmoColor.b, 0.2f);
+            Gizmos.DrawSphere(transform.position, _gizmoSize * 2f);
         }
 #endif
     }
