@@ -8,10 +8,6 @@ namespace M2922.Core
     /// Classe de base pour tout système du jeu (armure, santé, etc).
     public class M2922_System : M2922_Base
     {
-
-
-        
-        
          // === METHODE ===
         protected override void Start()
         {
