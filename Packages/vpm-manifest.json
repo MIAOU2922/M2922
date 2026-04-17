@@ -5,6 +5,9 @@
     },
     "com.vrchat.worlds": {
       "version": "3.10.2"
+    },
+    "dev.vrlabs.hierarchyplus": {
+      "version": "1.3.2"
     }
   },
   "locked": {
@@ -20,6 +23,10 @@
     },
     "com.vrchat.base": {
       "version": "3.10.2",
+      "dependencies": {}
+    },
+    "dev.vrlabs.hierarchyplus": {
+      "version": "1.3.2",
       "dependencies": {}
     }
   }
