@@ -6,7 +6,7 @@ using M2922.Combat;
 namespace M2922.Editor
 {
     [CustomEditor(typeof(M2922_Projectile))]
-    public class M2922_ProjectileEditor : UnityEditor.Editor
+    public class M2922_ProjectileEditor : M2922_BaseEditor
     {
         // ── Damage ────────────────────────────────────────────────────────────
         private SerializedProperty _damageTypesProp;
@@ -31,8 +31,9 @@ namespace M2922.Editor
 
         // ─────────────────────────────────────────────────────────────────────
 
-        private void OnEnable()
+        protected override void OnEnable()
         {
+            base.OnEnable();
             _damageTypesProp       = serializedObject.FindProperty("_damageTypes");
             _baseDamageAmountsProp = serializedObject.FindProperty("_baseDamageAmounts");
             _damageMultiplierProp  = serializedObject.FindProperty("_damageMultiplier");
@@ -161,6 +162,7 @@ namespace M2922.Editor
                 EditorGUILayout.PropertyField(_impactAudioProp,  new GUIContent("Impact Sound"));
             });
 
+            DrawVisualDebug();
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -186,23 +188,5 @@ namespace M2922.Editor
                 $"Explosion {radius:F1}m");
         }
 
-        // =====================================================================
-        // HELPERS
-        // =====================================================================
-
-        private static bool Section(string title, bool open, System.Action content)
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            open = EditorGUILayout.Foldout(open, title, true, EditorStyles.foldoutHeader);
-            if (open)
-            {
-                GUILayout.Space(2);
-                content();
-                GUILayout.Space(2);
-            }
-            EditorGUILayout.EndVertical();
-            GUILayout.Space(2);
-            return open;
-        }
     }
 }

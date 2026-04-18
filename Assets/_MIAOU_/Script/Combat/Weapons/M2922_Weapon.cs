@@ -112,8 +112,20 @@ namespace M2922.Combat
         [SerializeField] private LayerMask _hitLayers = -1;
 
         [Header("=== FIRE MODE ===")]
+        [Tooltip("true = tir automatique en maintenant la gâchette | false = semi-auto (un coup par appui)")]
+        [SerializeField] private bool _isAutoFire = false;
+
         [Tooltip("false = raycast (hitscan) | true = projectile physique via pool")]
         [SerializeField] private bool _useProjectile = false;
+
+        [Tooltip("Transform positionné au bout du canon. Le raycast / projectile part de là.\n" +
+                 "Si vide : utilise le transform de cet objet (non recommandé).")]
+        [SerializeField] private Transform _muzzlePoint;
+
+        [Tooltip("Temps de maintien de la gâchette requis avant le tir (secondes).\n" +
+                 "0 = aucune charge (comportement normal).\n" +
+                 "Ex : 1 = l'arme tire 1 seconde après l'appui, si la gâchette reste enfoncée.")]
+        [SerializeField] private float _chargeTime = 0f;
 
         // =====================================================================
         // PROJECTILE POOL
@@ -134,6 +146,14 @@ namespace M2922.Combat
 
         [Tooltip("Réserve de munitions totale de base (modifiable par buff via SetReserveSizeMultiplier)")]
         [SerializeField] private int _baseReserveSize = 60;
+
+        [Tooltip("Munitions dans le chargeur au spawn / après retour à l'origine.\n" +
+                 "-1 = chargeur plein (valeur par défaut).")]
+        [SerializeField] private int _spawnMagAmmo = -1;
+
+        [Tooltip("Munitions en réserve au spawn / après retour à l'origine.\n" +
+                 "-1 = réserve pleine (valeur par défaut).")]
+        [SerializeField] private int _spawnReserveAmmo = -1;
 
         [Tooltip("Si coché : aucune consommation de munitions, rechargement instantané")]
         [SerializeField] private bool _infiniteAmmo = false;
@@ -179,10 +199,15 @@ namespace M2922.Combat
         // VFX / SFX
         // =====================================================================
         [Header("=== VFX / SFX ===")]
+        [Tooltip("Particle system du flash au bout du canon.\nSon transform est orienté automatiquement dans la direction du tir avant Play().")]
         [SerializeField] private ParticleSystem _muzzleFlash;
+        [Tooltip("Particle system d'éjection de la douille.\nPositionné sur le côté de l'arme, joué tel quel (rotation libre).")]
+        [SerializeField] private ParticleSystem _casingEjection;
         [SerializeField] private AudioSource    _fireAudio;
         [SerializeField] private AudioSource    _reloadAudio;
         [SerializeField] private AudioSource    _emptyAudio;
+        [Tooltip("Son joué en boucle pendant la phase de charge (optionnel).")]
+        [SerializeField] private AudioSource    _chargeAudio;
 
         // =====================================================================
         // SYNCED
@@ -197,6 +222,10 @@ namespace M2922.Combat
         private float _nextFireTime;
         private bool  _isReloading;
         private int   _pendingMagAmmo = -1;   // >= 0 = MagSwap en cours avec ce montant
+
+        // Charge
+        private bool  _isCharging      = false;
+        private float _chargeStartTime = 0f;
 
         private float _magSizeMultiplier     = 1f;
         private float _reserveSizeMultiplier = 1f;
@@ -216,10 +245,12 @@ namespace M2922.Combat
         public int        CurrentAmmo      => _infiniteAmmo ? int.MaxValue : _currentAmmo;
         public int        MaxAmmo          => _effectiveMagSize;
         public int        ReserveAmmo      => _infiniteAmmo ? int.MaxValue : _currentReserveAmmo;
+        public bool       InfiniteAmmo     => _infiniteAmmo;
         public float      FireRate         => _fireRate;
         public float      Range            => _range;
         public bool       IsReloading      => _isReloading;
         public bool       UseProjectile    => _useProjectile;
+        public bool       IsAutoFire       => _isAutoFire;
         public ReloadMode CurrentReloadMode => _reloadMode;
         /// <summary>Dispersion courante en degrés (0 = parfaitement droit, montée tir par tir).</summary>
         public float      CurrentSpread    => _currentSpread;
@@ -237,10 +268,25 @@ namespace M2922.Combat
             }
         }
 
-        /// <summary>L'arme peut tirer : chargeur non vide (ou infini), pas en rechargement, cadence OK.</summary>
+        public float ChargeTime => _chargeTime;
+        /// <summary>Vrai si la gâchette est maintenue et le compteur de charge tourne.</summary>
+        public bool  IsCharging => _isCharging;
+        /// <summary>0..1 — avancement de la charge. Toujours 1 pour les armes sans charge.</summary>
+        public float ChargeProgress
+        {
+            get
+            {
+                if (_chargeTime <= 0f) return 1f;
+                if (!_isCharging)     return 0f;
+                return Mathf.Clamp01((Time.time - _chargeStartTime) / _chargeTime);
+            }
+        }
+
+        /// <summary>L'arme peut tirer : chargeur non vide (ou infini), pas en rechargement, cadence OK, charge complète.</summary>
         public bool CanFire => (_infiniteAmmo || _currentAmmo > 0)
                             && !_isReloading
-                            && Time.time >= _nextFireTime;
+                            && Time.time >= _nextFireTime
+                            && (_chargeTime <= 0f || (_isCharging && Time.time - _chargeStartTime >= _chargeTime));
 
         /// <summary>TriggerReload() acceptée dans ce mode (Manual uniquement).</summary>
         public bool CanTriggerReload => _reloadMode == ReloadMode.Manual && !_isReloading;
@@ -248,24 +294,42 @@ namespace M2922.Combat
         // =====================================================================
         // LIFECYCLE
         // =====================================================================
-        protected override void Awake()
-        {
-            RecalculateEffectiveValues();
-            _currentAmmo        = _effectiveMagSize;
-            _currentReserveAmmo = _effectiveReserveSize;
-        }
+
+        // Awake() non utilisé : UdonSharp ne garantit pas son appel.
+        // Toute l'initialisation est dans Start().
 
         protected override void Start()
         {
             base.Start();
+
+            // 1. Multiplicateurs (UdonSharp initialise les privés non-sérialisés à 0)
+            _damageMultiplier      = 1f;
+            _magSizeMultiplier     = 1f;
+            _reserveSizeMultiplier = 1f;
+            _spreadMultiplier      = 1f;
+            _pendingMagAmmo        = -1;
+
+            // 2. Calcul des valeurs effectives (dépend des multiplicateurs ci-dessus)
+            RecalculateEffectiveValues();
+
+            // 3. Application de l'ammo spawn (dépend de _effectiveMagSize/_effectiveReserveSize)
+            RestoreSpawnAmmo();
+
+            // 4. Synchro réseau
+            if (Networking.IsOwner(gameObject))
+                RequestSerialization();
         }
 
         protected override void Update()
         {
             base.Update();
 
-            // Récupération passive du spread (même si le porteur n'est pas owner — local uniquement)
-            if (_currentSpread > 0f && _effectiveMaxSpread > 0f && _spreadRecoveryRate > 0f)
+            // Récupération passive du spread UNIQUEMENT quand l'arme est au repos.
+            // Pendant le tir automatique, _nextFireTime est toujours dans le futur :
+            // la récupération est suspendue, le spread monte bien tir après tir.
+            // Dès que la gâchette est relâchée et que l'intervalle de tir expire, la récup reprend.
+            if (_currentSpread > 0f && _effectiveMaxSpread > 0f && _spreadRecoveryRate > 0f
+                && Time.time >= _nextFireTime)
                 _currentSpread = Mathf.Max(0f, _currentSpread - _spreadRecoveryRate * Time.deltaTime);
         }
 
@@ -338,6 +402,39 @@ namespace M2922.Combat
         public void SetAttackerId(int playerId) { _attackerId = playerId; }
 
         // =====================================================================
+        // CHARGE API
+        // =====================================================================
+
+        /// <summary>
+        /// Démarre le compteur de charge. Appeler quand la gâchette est enfoncée.
+        /// No-op si l'arme n'a pas de charge (<c>_chargeTime &lt;= 0</c>) ou si déjà en charge.
+        /// </summary>
+        public void BeginCharge()
+        {
+            if (_chargeTime <= 0f)  return;
+            if (_isCharging)        return;
+            if (_isReloading)       return;
+            if (!_infiniteAmmo && _currentAmmo <= 0) return;
+
+            _isCharging      = true;
+            _chargeStartTime = Time.time;
+            PlayChargeSound();
+            this.VerboseLog($"[Weapon] Charge démarrée ({_chargeTime}s)");
+        }
+
+        /// <summary>
+        /// Annule la charge sans tirer. Appeler quand la gâchette est relâchée avant que la charge soit complète.
+        /// No-op si l'arme n'a pas de charge.
+        /// </summary>
+        public void CancelCharge()
+        {
+            if (!_isCharging) return;
+            _isCharging = false;
+            StopChargeSound();
+            this.VerboseLog("[Weapon] Charge annulée");
+        }
+
+        // =====================================================================
         // FIRE API
         // =====================================================================
 
@@ -352,12 +449,14 @@ namespace M2922.Combat
             if (!_infiniteAmmo) _currentAmmo--;
             _nextFireTime = Time.time + 1f / Mathf.Max(0.01f, _fireRate);
 
-            PlayMuzzleFlash();
-            PlayFireSound();
+            // Direction calculée en premier — nécessaire pour aligner le VFX muzzle flash
+            Transform muzzle  = muzzleTransform != null ? muzzleTransform
+                              : (_muzzlePoint != null ? _muzzlePoint : transform);
+            Vector3   shotDir = _ApplySpread(muzzle.forward, _currentSpread);
 
-            // Calcul de la direction avec spread courant, puis accumulation
-            Transform muzzle    = muzzleTransform != null ? muzzleTransform : transform;
-            Vector3   shotDir   = _ApplySpread(muzzle.forward, _currentSpread);
+            PlayMuzzleFlash(shotDir);
+            PlayCasingEjection();
+            PlayFireSound();
 
             if (_useProjectile)
                 FireProjectile(muzzle, shotDir);
@@ -367,6 +466,13 @@ namespace M2922.Combat
             // Accumulation du spread après le tir
             if (_effectiveMaxSpread > 0f)
                 _currentSpread = Mathf.Min(_effectiveMaxSpread, _currentSpread + _effectiveSpreadPerShot);
+
+            // Réinitialiser la charge (une seule salve par charge)
+            if (_chargeTime > 0f)
+            {
+                _isCharging = false;
+                StopChargeSound();
+            }
 
             RequestSerialization();
             PublishWeaponEvent(EventType.OnWeaponFired);
@@ -436,6 +542,19 @@ namespace M2922.Combat
             _BeginReload();
         }
 
+        /// <summary>
+        /// Remet les munitions aux valeurs configurées au spawn (_spawnMagAmmo / _spawnReserveAmmo).
+        /// -1 = plein. Appelé au Awake et lors du retour à l'origine de la WeaponEntity.
+        /// </summary>
+        public void RestoreSpawnAmmo()
+        {
+            _currentAmmo        = _spawnMagAmmo    < 0 ? _effectiveMagSize     : Mathf.Clamp(_spawnMagAmmo,    0, _effectiveMagSize);
+            _currentReserveAmmo = _spawnReserveAmmo < 0 ? _effectiveReserveSize : Mathf.Clamp(_spawnReserveAmmo, 0, _effectiveReserveSize);
+            _isReloading        = false;
+            _currentSpread      = 0f;
+            RequestSerialization();
+        }
+
         /// <summary>Ajouter des munitions de réserve (power-up, caisse…). Ignoré si infini.</summary>
         public void AddAmmo(int amount)
         {
@@ -460,6 +579,9 @@ namespace M2922.Combat
         public void _BeginReload()
         {
             if (_isReloading) return;
+
+            // Annuler la charge si en cours (rechargement interrompt la charge)
+            CancelCharge();
 
             // Guard : si rechargement depuis réserve, vérifier qu'il y a quelque chose à prendre
             if (!_infiniteAmmo && _pendingMagAmmo < 0 && _currentReserveAmmo <= 0) return;
@@ -632,11 +754,27 @@ namespace M2922.Combat
                 _effectiveDamageAmounts[i] = Mathf.Max(0f, _baseDamageAmounts[i] * _damageMultiplier);
         }
 
-        private void PlayMuzzleFlash() { if (_muzzleFlash != null) _muzzleFlash.Play(); }
+        private void PlayMuzzleFlash(Vector3 shotDir)
+        {
+            if (_muzzleFlash == null) return;
+            _muzzleFlash.transform.rotation = Quaternion.LookRotation(shotDir);
+            _muzzleFlash.Play();
+        }
+        private void PlayCasingEjection() { if (_casingEjection != null) _casingEjection.Play(); }
         private void PlayFireSound()
         {
             if (_fireAudio != null && _fireAudio.clip != null)
                 _fireAudio.PlayOneShot(_fireAudio.clip);
+        }
+        private void PlayChargeSound()
+        {
+            if (_chargeAudio != null && _chargeAudio.clip != null)
+                _chargeAudio.Play();
+        }
+        private void StopChargeSound()
+        {
+            if (_chargeAudio != null && _chargeAudio.isPlaying)
+                _chargeAudio.Stop();
         }
         private void PlayReloadSound()
         {
@@ -680,6 +818,7 @@ namespace M2922.Combat
             _baseMaxSpread       = Mathf.Max(0f,    _baseMaxSpread);
             _baseSpreadPerShot   = Mathf.Max(0f,    _baseSpreadPerShot);
             _spreadRecoveryRate  = Mathf.Max(0f,    _spreadRecoveryRate);
+            _chargeTime          = Mathf.Max(0f,    _chargeTime);
 
             if (_damageTypes != null && _baseDamageAmounts != null
                 && _damageTypes.Length != _baseDamageAmounts.Length)
@@ -705,7 +844,7 @@ namespace M2922.Combat
                 : $"{_reloadMode} ({_reloadTime}s)";
 
             UnityEditor.Handles.Label(
-                transform.position + Vector3.up * (_gizmoSize * 5f),
+                transform.position + Vector3.up * (_gizmoSize * 1f),
                 $"[Weapon] {_weaponDisplayName} ({_weaponType})\n" +
                 $"Dégâts: {dmgSummary}\nCrit: ×{_critMultiplier}\n" +
                 $"Chargeur: {_baseMagSize} | Réserve: {_baseReserveSize} | Infini: {_infiniteAmmo}\n" +

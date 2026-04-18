@@ -7,23 +7,28 @@ using M2922.Core;
 namespace M2922.Editor
 {
     [CustomEditor(typeof(M2922_BuffSystem))]
-    public class M2922_BuffSystemEditor : UnityEditor.Editor
+    public class M2922_BuffSystemEditor : M2922_BaseEditor
     {
+        // ── Preset arrays ─────────────────────────────────────────────────────
         private SerializedProperty _presetTypesProp;
         private SerializedProperty _presetMagnitudesProp;
         private SerializedProperty _presetDurationsProp;
         private SerializedProperty _presetDamageTypesProp;
 
-        // Ajout d'un buff preset via l'Editor
-        private BuffType _newBuffType      = BuffType.MoveSpeed;
-        private float    _newMagnitude     = 1f;
-        private float    _newDuration      = -1f;
+        // ── Runtime test state ────────────────────────────────────────────────
+        private BuffType _testBuffType  = BuffType.MoveSpeed;
+        private float    _testMagnitude = 1f;
+        private float    _testDuration  = -1f;
 
-        private bool _presetFoldout = true;
-        private bool _runtimeFoldout = true;
+        // ── UI state ──────────────────────────────────────────────────────────
+        private bool _presetsOpen = true;
+        private bool _runtimeOpen = true;
 
-        private void OnEnable()
+        // ─────────────────────────────────────────────────────────────────────
+
+        protected override void OnEnable()
         {
+            base.OnEnable();
             _presetTypesProp       = serializedObject.FindProperty("_presetTypes");
             _presetMagnitudesProp  = serializedObject.FindProperty("_presetMagnitudes");
             _presetDurationsProp   = serializedObject.FindProperty("_presetDurations");
@@ -33,89 +38,92 @@ namespace M2922.Editor
         public override void OnInspectorGUI()
         {
             if (UdonSharpGUI.DrawDefaultUdonSharpBehaviourHeader(target)) return;
-            serializedObject.Update();
 
+            serializedObject.Update();
             M2922_BuffSystem buffSystem = (M2922_BuffSystem)target;
 
-            // === STATUS (Play mode) ===
+            // =================================================================
+            // RUNTIME STATUS
+            // =================================================================
             if (Application.isPlaying)
             {
-                _runtimeFoldout = EditorGUILayout.Foldout(_runtimeFoldout, "RUNTIME STATUS", true, EditorStyles.foldoutHeader);
-                if (_runtimeFoldout)
+                _runtimeOpen = Section("RUNTIME", _runtimeOpen, () =>
                 {
-                    EditorGUILayout.BeginVertical("box");
-
-                    EditorGUILayout.LabelField("Has Active Buff", buffSystem.HasActiveBuff.ToString());
+                    Color prevC = GUI.contentColor;
+                    GUI.contentColor = buffSystem.HasActiveBuff ? Color.green : Color.gray;
+                    EditorGUILayout.LabelField(
+                        buffSystem.HasActiveBuff ? "\u25cf Buff(s) actif(s)" : "\u25cb Aucun buff actif",
+                        EditorStyles.boldLabel);
+                    GUI.contentColor = prevC;
 
                     GUILayout.Space(4);
-                    EditorGUILayout.LabelField("Test", EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField("Appliquer un buff test", EditorStyles.boldLabel);
 
                     EditorGUILayout.BeginHorizontal();
-                    _newBuffType  = (BuffType)EditorGUILayout.EnumPopup(_newBuffType);
-                    _newMagnitude = EditorGUILayout.FloatField(_newMagnitude, GUILayout.Width(50));
-                    _newDuration  = EditorGUILayout.FloatField(_newDuration,  GUILayout.Width(50));
-                    if (GUILayout.Button("Apply", GUILayout.Width(55)))
-                        buffSystem.ApplyBuff(_newBuffType, _newMagnitude, _newDuration);
-                    if (GUILayout.Button("Remove", GUILayout.Width(55)))
-                        buffSystem.RemoveBuff(_newBuffType);
+                    _testBuffType  = (BuffType)EditorGUILayout.EnumPopup(_testBuffType);
+                    EditorGUILayout.LabelField(GetMagnitudeUnit(_testBuffType),
+                        EditorStyles.miniLabel, GUILayout.Width(48));
+                    _testMagnitude = EditorGUILayout.FloatField(_testMagnitude, GUILayout.Width(50));
+                    EditorGUILayout.LabelField("dur(s)", EditorStyles.miniLabel, GUILayout.Width(38));
+                    _testDuration  = EditorGUILayout.FloatField(_testDuration,  GUILayout.Width(50));
+                    EditorGUILayout.LabelField(
+                        _testDuration < 0f ? "perm" : $"{_testDuration:F0}s",
+                        EditorStyles.miniLabel, GUILayout.Width(30));
                     EditorGUILayout.EndHorizontal();
 
-                    EditorGUILayout.LabelField("", "Type | Magnitude | Duration(-1=perm)", EditorStyles.miniLabel);
-
-                    GUILayout.Space(4);
-                    if (GUILayout.Button("Clear All Buffs"))
+                    EditorGUILayout.BeginHorizontal();
+                    if (GUILayout.Button("Apply"))
+                        buffSystem.ApplyBuff(_testBuffType, _testMagnitude, _testDuration);
+                    if (GUILayout.Button("Remove"))
+                        buffSystem.RemoveBuff(_testBuffType);
+                    if (GUILayout.Button("Clear All"))
                         buffSystem.ClearAllBuffs();
-
-                    EditorGUILayout.EndVertical();
-                }
-                GUILayout.Space(8);
+                    EditorGUILayout.EndHorizontal();
+                });
             }
 
-            // === PRESET BUFFS ===
-            _presetFoldout = EditorGUILayout.Foldout(_presetFoldout, "PRESET BUFFS", true, EditorStyles.foldoutHeader);
-            if (_presetFoldout)
+            // =================================================================
+            // PRESET BUFFS
+            // =================================================================
+            _presetsOpen = Section("PRESET BUFFS", _presetsOpen, () =>
             {
-                EditorGUILayout.BeginVertical("box");
                 EditorGUILayout.HelpBox(
-                    "Ces buffs sont appliqués automatiquement au Start().\n" +
-                    "Duration = -1 → permanent.",
-                    MessageType.Info
-                );
+                    "Ces buffs sont appliqu\u00e9s automatiquement au Start().\n" +
+                    "Duration = -1 \u2192 permanent.",
+                    MessageType.None);
                 GUILayout.Space(4);
 
-                // Largeurs fixes — doivent correspondre exactement entre header et lignes
                 const float W_TYPE  = 105f;
                 const float W_MAG   = 45f;
                 const float W_UNIT  = 48f;
-                const float W_DUR   = 38f;
-                const float W_DURLB = 38f;
+                const float W_DUR   = 40f;
+                const float W_DURLB = 36f;
                 const float W_DMG   = 76f;
                 const float W_BTN   = 22f;
 
-                // En-têtes des colonnes
+                // En-t\u00eates
                 EditorGUILayout.BeginHorizontal();
-                EditorGUILayout.LabelField("Type",      EditorStyles.miniLabel, GUILayout.Width(W_TYPE));
-                EditorGUILayout.LabelField("Magnitude", EditorStyles.miniLabel, GUILayout.Width(W_MAG));
-                EditorGUILayout.LabelField("Unité",     EditorStyles.miniLabel, GUILayout.Width(W_UNIT));
-                EditorGUILayout.LabelField("Durée (s)", EditorStyles.miniLabel, GUILayout.Width(W_DUR));
-                EditorGUILayout.LabelField("",          EditorStyles.miniLabel, GUILayout.Width(W_DURLB));
-                EditorGUILayout.LabelField("DmgType",   EditorStyles.miniLabel, GUILayout.Width(W_DMG));
+                EditorGUILayout.LabelField("Type",       EditorStyles.miniLabel, GUILayout.Width(W_TYPE));
+                EditorGUILayout.LabelField("Magnitude",  EditorStyles.miniLabel, GUILayout.Width(W_MAG));
+                EditorGUILayout.LabelField("Unit\u00e9",      EditorStyles.miniLabel, GUILayout.Width(W_UNIT));
+                EditorGUILayout.LabelField("Dur\u00e9e (s)",  EditorStyles.miniLabel, GUILayout.Width(W_DUR));
+                EditorGUILayout.LabelField("",           EditorStyles.miniLabel, GUILayout.Width(W_DURLB));
+                EditorGUILayout.LabelField("DmgType",    EditorStyles.miniLabel, GUILayout.Width(W_DMG));
                 EditorGUILayout.EndHorizontal();
 
-                // Synchroniser les tailles des tableaux
                 int count = _presetTypesProp.arraySize;
-
                 for (int i = 0; i < count; i++)
                 {
-                    EditorGUILayout.BeginHorizontal();
-
                     SerializedProperty typeProp      = _presetTypesProp.GetArrayElementAtIndex(i);
                     SerializedProperty magnitudeProp = _presetMagnitudesProp.arraySize > i ? _presetMagnitudesProp.GetArrayElementAtIndex(i) : null;
                     SerializedProperty durationProp  = _presetDurationsProp.arraySize  > i ? _presetDurationsProp.GetArrayElementAtIndex(i)  : null;
-                    SerializedProperty dmgTypeProp   = _presetDamageTypesProp != null && _presetDamageTypesProp.arraySize > i ? _presetDamageTypesProp.GetArrayElementAtIndex(i) : null;
+                    SerializedProperty dmgTypeProp   = _presetDamageTypesProp != null && _presetDamageTypesProp.arraySize > i
+                        ? _presetDamageTypesProp.GetArrayElementAtIndex(i) : null;
 
-                    BuffType buffType = (BuffType)typeProp.enumValueIndex;
-                    bool isPassiveDamage = buffType == BuffType.PassiveDamage;
+                    BuffType buffType     = (BuffType)typeProp.enumValueIndex;
+                    bool     isPassiveDmg = buffType == BuffType.PassiveDamage;
+
+                    EditorGUILayout.BeginHorizontal();
 
                     EditorGUILayout.PropertyField(typeProp, GUIContent.none, GUILayout.Width(W_TYPE));
 
@@ -124,10 +132,7 @@ namespace M2922.Editor
                         EditorGUILayout.PropertyField(magnitudeProp, GUIContent.none, GUILayout.Width(W_MAG));
                         EditorGUILayout.LabelField(GetMagnitudeUnit(buffType), EditorStyles.miniLabel, GUILayout.Width(W_UNIT));
                     }
-                    else
-                    {
-                        EditorGUILayout.LabelField("", GUILayout.Width(W_MAG + W_UNIT));
-                    }
+                    else { EditorGUILayout.LabelField("", GUILayout.Width(W_MAG + W_UNIT)); }
 
                     if (durationProp != null)
                     {
@@ -135,22 +140,20 @@ namespace M2922.Editor
                         string durLabel = durationProp.floatValue < 0f ? "perm" : $"{durationProp.floatValue:F0}s";
                         EditorGUILayout.LabelField(durLabel, EditorStyles.miniLabel, GUILayout.Width(W_DURLB));
                     }
-                    else
-                    {
-                        EditorGUILayout.LabelField("", GUILayout.Width(W_DUR + W_DURLB));
-                    }
+                    else { EditorGUILayout.LabelField("", GUILayout.Width(W_DUR + W_DURLB)); }
 
-                    if (dmgTypeProp != null && isPassiveDamage)
+                    if (dmgTypeProp != null && isPassiveDmg)
                         EditorGUILayout.PropertyField(dmgTypeProp, GUIContent.none, GUILayout.Width(W_DMG));
                     else
-                        EditorGUILayout.LabelField("—", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(W_DMG));
+                        EditorGUILayout.LabelField("\u2014", EditorStyles.centeredGreyMiniLabel, GUILayout.Width(W_DMG));
 
-                    if (GUILayout.Button("✕", GUILayout.Width(W_BTN)))
+                    if (GUILayout.Button("\u2715", GUILayout.Width(W_BTN)))
                     {
                         _presetTypesProp.DeleteArrayElementAtIndex(i);
                         if (_presetMagnitudesProp.arraySize  > i) _presetMagnitudesProp.DeleteArrayElementAtIndex(i);
                         if (_presetDurationsProp.arraySize   > i) _presetDurationsProp.DeleteArrayElementAtIndex(i);
-                        if (_presetDamageTypesProp != null && _presetDamageTypesProp.arraySize > i) _presetDamageTypesProp.DeleteArrayElementAtIndex(i);
+                        if (_presetDamageTypesProp != null && _presetDamageTypesProp.arraySize > i)
+                            _presetDamageTypesProp.DeleteArrayElementAtIndex(i);
                         break;
                     }
                     EditorGUILayout.EndHorizontal();
@@ -170,14 +173,17 @@ namespace M2922.Editor
                     _presetDurationsProp.GetArrayElementAtIndex(last).floatValue       = -1f;
                     _presetDamageTypesProp.GetArrayElementAtIndex(last).enumValueIndex = 0;
                 }
+            });
 
-                EditorGUILayout.EndVertical();
-            }
-
+            DrawVisualDebug();
             serializedObject.ApplyModifiedProperties();
         }
 
-        private string GetMagnitudeUnit(BuffType buffType)
+        // =====================================================================
+        // HELPERS
+        // =====================================================================
+
+        private static string GetMagnitudeUnit(BuffType buffType)
         {
             switch (buffType)
             {

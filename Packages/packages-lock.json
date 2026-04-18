@@ -249,6 +249,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "dev.vrlabs.particle-bufferer": {
+      "version": "file:dev.vrlabs.particle-bufferer",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.modules.ai": {
       "version": "1.0.0",
       "depth": 0,

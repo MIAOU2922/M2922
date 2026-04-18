@@ -19,11 +19,18 @@ namespace M2922.Entity.Prop
         // === HELPERS ===
         public bool HasHealth => HealthSystem != null;
         public bool HasBuffs  => BuffSystem  != null;
+
+        // === PICKUP ===
+        private VRC_Pickup _pickup;  // cache — null si le prop n'est pas ramassable
+        /// <summary>True si ce prop est actuellement tenu par un joueur. Source de vérité = VRC_Pickup.IsHeld.</summary>
+        public bool IsHeld => _pickup != null && _pickup.IsHeld;
+
         // === HELPER METHODS ===
         private void TryFindSystems()
         {
             if (HealthSystem == null) HealthSystem = GetComponent<M2922_HealthSystem>();
             if (BuffSystem  == null) BuffSystem  = GetComponent<M2922_BuffSystem>();
+            if (_pickup     == null) _pickup      = GetComponent<VRC_Pickup>();
         }
 
         // === IDamageable (inline) ===

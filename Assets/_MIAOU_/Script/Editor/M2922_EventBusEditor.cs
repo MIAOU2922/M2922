@@ -1,67 +1,104 @@
 using UnityEditor;
 using UnityEngine;
+using UdonSharpEditor;
+using M2922.Core;
+using EventType = M2922.Core.EventType;
 
 namespace M2922.Editor
 {
-    /// <summary>
-    /// Custom Editor pour M2922_EventBus
-    /// Affiche le nombre d'événements et permet de forcer le recalcul
-    /// </summary>
-    [CustomEditor(typeof(M2922.Core.M2922_EventBus))]
-    public class M2922_EventBusEditor : UnityEditor.Editor
+    [CustomEditor(typeof(M2922_EventBus))]
+    public class M2922_EventBusEditor : M2922_BaseEditor
     {
+        // ── Settings ──────────────────────────────────────────────────────────
+        private SerializedProperty _maxListenersProp;
+        private SerializedProperty _eventTypeCountProp;
+        private SerializedProperty _maxEventTypeValueProp;
+        private SerializedProperty _poolProp;
+
+        // ── UI state ──────────────────────────────────────────────────────────
+        private bool _settingsOpen = true;
+        private bool _poolOpen     = false;
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _maxListenersProp      = serializedObject.FindProperty("maxListenersPerEvent");
+            _eventTypeCountProp    = serializedObject.FindProperty("_eventTypeCount");
+            _maxEventTypeValueProp = serializedObject.FindProperty("_maxEventTypeValue");
+            _poolProp              = serializedObject.FindProperty("_pool");
+        }
+
         public override void OnInspectorGUI()
         {
+            if (UdonSharpGUI.DrawDefaultUdonSharpBehaviourHeader(target)) return;
+
             serializedObject.Update();
-            
-            // Dessiner l'inspecteur par défaut
-            DrawDefaultInspector();
-            
-            GUILayout.Space(10);
-            
-            // Section d'information sur les événements
-            EditorGUILayout.BeginVertical("box");
-            EditorGUILayout.LabelField("📊 Event System Info", EditorStyles.boldLabel);
-            
-            SerializedProperty eventTypeCountProp = serializedObject.FindProperty("_eventTypeCount");
-            int eventCount = eventTypeCountProp.intValue;
-            
-            // Calculer le nombre réel d'événements dans l'enum
-            int actualCount = System.Enum.GetValues(typeof(M2922.Core.EventType)).Length;
-            
-            EditorGUILayout.LabelField("Événements configurés:", eventCount.ToString());
-            EditorGUILayout.LabelField("Événements dans enum:", actualCount.ToString());
-            
-            // Avertissement si mismatch
-            if (eventCount != actualCount)
+
+            // =================================================================
+            // EVENT BUS SETTINGS
+            // =================================================================
+            _settingsOpen = Section("EVENT BUS SETTINGS", _settingsOpen, () =>
             {
-                EditorGUILayout.HelpBox(
-                    $"⚠️ Mismatch détecté!\n" +
-                    $"Configuré: {eventCount} | Enum: {actualCount}\n" +
-                    $"Cliquez sur 'Update Event Count' pour synchroniser.",
-                    MessageType.Warning
-                );
-                
-                GUILayout.Space(5);
-                
-                if (GUILayout.Button("🔄 Update Event Count", GUILayout.Height(30)))
+                EditorGUILayout.PropertyField(_maxListenersProp,
+                    new GUIContent("Max Listeners / Event",
+                        "Nombre maximum d'abonnés par type d'événement."));
+
+                GUILayout.Space(4);
+
+                int configured = _eventTypeCountProp.intValue;
+                int actual     = System.Enum.GetValues(typeof(EventType)).Length;
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Types d'événements configurés", GUILayout.Width(220));
+                EditorGUILayout.LabelField(configured.ToString(), EditorStyles.boldLabel);
+                EditorGUILayout.EndHorizontal();
+
+                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.LabelField("Types dans l'enum EventType", GUILayout.Width(220));
+                EditorGUILayout.LabelField(actual.ToString(), EditorStyles.boldLabel);
+                EditorGUILayout.EndHorizontal();
+
+                if (configured != actual)
                 {
-                    eventTypeCountProp.intValue = actualCount;
-                    serializedObject.ApplyModifiedProperties();
-                    EditorUtility.SetDirty(target);
-                    Debug.Log($"[M2922 EventBus] Event count updated: {eventCount} → {actualCount}");
+                    EditorGUILayout.HelpBox(
+                        $"Désynchronisé ! Configuré : {configured} | Enum : {actual}\n" +
+                        "Cliquez sur Synchroniser pour corriger.",
+                        MessageType.Warning);
+
+                    if (GUILayout.Button("Synchroniser le count"))
+                    {
+                        _eventTypeCountProp.intValue = actual;
+                        serializedObject.ApplyModifiedProperties();
+                        EditorUtility.SetDirty(target);
+                        Debug.Log($"[M2922 EventBus] Event count : {configured} → {actual}");
+                    }
                 }
-            }
-            else
+                else
+                {
+                    EditorGUILayout.LabelField("→ Synchronisé ✓", EditorStyles.miniLabel);
+                }
+
+                GUILayout.Space(4);
+                EditorGUILayout.PropertyField(_maxEventTypeValueProp,
+                    new GUIContent("Max EventType Value + 1",
+                        "Calculé automatiquement via OnValidate."));
+            });
+
+            // =================================================================
+            // EVENT DATA POOL
+            // =================================================================
+            _poolOpen = Section("EVENT DATA POOL", _poolOpen, () =>
             {
                 EditorGUILayout.HelpBox(
-                    "✅ Event count is synchronized with enum.",
-                    MessageType.Info
-                );
-            }
-            
-            EditorGUILayout.EndVertical();
-            
+                    "Slots M2922_EventData — enfants du GameObject EventBus.\n" +
+                    "Laisser vide : auto-découverts au Start().",
+                    MessageType.None);
+                EditorGUILayout.PropertyField(_poolProp, new GUIContent("Pool"));
+            });
+
+            DrawVisualDebug();
             serializedObject.ApplyModifiedProperties();
         }
     }

@@ -55,8 +55,12 @@ namespace M2922.Entity.Weapon
         // =====================================================================
         // RUNTIME
         // =====================================================================
-        private bool  _isEquipped;
+        private VRC_Pickup _pickup;          // cache — évite GetComponent chaque frame
         private bool  _triggerHeld;
+        private bool  _isEquipped;            // flag fiable, géré dans OnPickup/OnDrop
+        public bool   IsEquipped => _isEquipped;
+        /// <summary>Référence au système arme (lecture seule, pour les éditeurs et systèmes externes).</summary>
+        public M2922_Weapon Weapon => _weapon;
         private bool  _reloadInputHeld;            // évite répétition sur axe continu
         private float _dropTime;
         private bool  _pendingReturn;
@@ -75,6 +79,8 @@ namespace M2922.Entity.Weapon
 
             if (_weapon == null)
                 _weapon = GetComponent<M2922_Weapon>();
+
+            _pickup = GetComponent<VRC_Pickup>();
 
             if (_weapon == null)
                 M2922_Debug.Error("[WeaponEntity] M2922_Weapon introuvable ! " +
@@ -95,24 +101,30 @@ namespace M2922.Entity.Weapon
         protected override void Update()
         {
             base.Update();
-            if (!_isEquipped) return;
             if (!Networking.IsOwner(gameObject)) return;
 
-            // ── Auto-fire (arme automatique) ──────────────────────────────────
-            if (_weapon != null && _weapon.UseProjectile == false && _triggerHeld && _weapon.CanFire)
-                _weapon.Fire(null);   // muzzle géré par la Weapon elle-même
-
-            // ── Reload input (ReloadMode.Manual) ─────────────────────────────
-            if (_weapon != null && _weapon.CurrentReloadMode == ReloadMode.Manual)
-                CheckReloadInput();
-
-            // ── Retour auto (déclenché après lâché dans OnDrop) ──────────────
+            // ── Retour auto — vérifié indépendamment du pickup ────────────────
             if (_pendingReturn && _returnDelay >= 0f
                 && Time.time - _dropTime >= _returnDelay)
             {
                 _pendingReturn = false;
                 ReturnToOrigin();
             }
+
+            // ── Auto-fire / charge — indépendant de IsEquipped ───────────────
+            // _triggerHeld est remis à false dans OnDrop() : pas de tir fantôme
+            if (_weapon != null && _triggerHeld && _weapon.CanFire)
+            {
+                bool isChargeWeapon = _weapon.ChargeTime > 0f;
+                if (isChargeWeapon || _weapon.IsAutoFire)
+                    _weapon.Fire(null);
+            }
+
+            if (!IsEquipped) return;
+
+            // ── Reload input (ReloadMode.Manual) ─────────────────────────────
+            if (_weapon != null && _weapon.CurrentReloadMode == ReloadMode.Manual)
+                CheckReloadInput();
         }
 
         // =====================================================================
@@ -128,9 +140,9 @@ namespace M2922.Entity.Weapon
             if (_weapon != null)
                 _weapon.SetAttackerId(player.playerId);
 
-            _isEquipped    = true;
             _pendingReturn = false;
             _triggerHeld   = false;
+            _isEquipped    = true;
 
             PublishWeaponEvent(EventType.OnWeaponEquipped);
             this.Log($"[WeaponEntity] {_entityName} pris par {player.displayName}");
@@ -139,11 +151,14 @@ namespace M2922.Entity.Weapon
         public override void OnDrop()
         {
             if (_weapon != null)
+            {
                 _weapon.SetAttackerId(-1);
+                _weapon.CancelCharge();
+            }
 
-            _isEquipped    = false;
-            _triggerHeld   = false;
+            _triggerHeld     = false;
             _reloadInputHeld = false;
+            _isEquipped      = false;
 
             PublishWeaponEvent(EventType.OnWeaponDropped);
             this.Log($"[WeaponEntity] {_entityName} lâché");
@@ -162,15 +177,26 @@ namespace M2922.Entity.Weapon
             if (_weapon == null) return;
             _triggerHeld = true;
 
-            if (_weapon.CanFire)
-                _weapon.Fire(null);
-            else if (!_weapon.CanFire && !_weapon.IsReloading)
-                _weapon.PlayEmptySound();
+            if (_weapon.ChargeTime > 0f)
+            {
+                // Arme à charge : démarre le compteur. Le tir se déclenchera
+                // automatiquement dans Update() quand la charge sera complète.
+                _weapon.BeginCharge();
+            }
+            else
+            {
+                // Arme classique : tir immédiat (semi-auto ou premier coup auto)
+                if (_weapon.CanFire)
+                    _weapon.Fire(null);
+                else if (!_weapon.IsReloading)
+                    _weapon.PlayEmptySound();
+            }
         }
 
         public override void OnPickupUseUp()
         {
             _triggerHeld = false;
+            if (_weapon != null) _weapon.CancelCharge();
         }
 
         // =====================================================================
@@ -186,7 +212,16 @@ namespace M2922.Entity.Weapon
             if (!Networking.IsOwner(gameObject))
                 Networking.SetOwner(Networking.LocalPlayer, gameObject);
 
+            // Dropper explicitement avant de téléporter : évite le MissingReferenceException
+            // dans VRC_Pickup.OnDisable() qui tente de lâcher l'arme sur un transform détruit.
+            if (_pickup != null && _isEquipped)
+                _pickup.Drop();
+
             transform.SetPositionAndRotation(_originPosition, _originRotation);
+
+            if (_weapon != null)
+                _weapon.RestoreSpawnAmmo();
+
             this.Log($"[WeaponEntity] {_entityName} retournée à l'origine");
         }
 
