@@ -1,98 +1,164 @@
 using UnityEditor;
 using UnityEngine;
 using UdonSharpEditor;
+using M2922.Spawning;
 
 namespace M2922.Editor
 {
-    /// <summary>
-    /// Custom Editor pour M2922_SpawnManager
-    /// Auto-remplit la liste de spawn points quand Auto Discover est activé
-    /// </summary>
-    [CustomEditor(typeof(M2922.Spawning.M2922_SpawnManager))]
-    public class M2922_SpawnManagerEditor : UnityEditor.Editor
+    [CustomEditor(typeof(M2922_SpawnManager))]
+    public class M2922_SpawnManagerEditor : M2922_BaseEditor
     {
+        // ── References ────────────────────────────────────────────────────────
+        private SerializedProperty _teamManagerProp;
+
+        // ── Spawn settings ────────────────────────────────────────────────────
+        private SerializedProperty _spawnStrategyProp;
+        private SerializedProperty _spawnProtectionDurationProp;
+        private SerializedProperty _spawnCooldownProp;
+        private SerializedProperty _minEnemyDistanceProp;
+
+        // ── Spawn points ──────────────────────────────────────────────────────
         private SerializedProperty _autoDiscoverProp;
         private SerializedProperty _spawnPointsProp;
-        
-        private void OnEnable()
+
+        // ── Respawn ───────────────────────────────────────────────────────────
+        private SerializedProperty _autoRespawnProp;
+        private SerializedProperty _respawnDelayProp;
+
+        // ── UI state ──────────────────────────────────────────────────────────
+        private bool _refsOpen     = true;
+        private bool _settingsOpen = true;
+        private bool _pointsOpen   = true;
+        private bool _respawnOpen  = true;
+
+        // ─────────────────────────────────────────────────────────────────────
+
+        protected override void OnEnable()
         {
-            _autoDiscoverProp = serializedObject.FindProperty("_autoDiscoverSpawnPoints");
-            _spawnPointsProp = serializedObject.FindProperty("_spawnPoints");
+            base.OnEnable();
+            _teamManagerProp             = serializedObject.FindProperty("_teamManager");
+            _spawnStrategyProp           = serializedObject.FindProperty("_spawnStrategy");
+            _spawnProtectionDurationProp = serializedObject.FindProperty("_spawnProtectionDuration");
+            _spawnCooldownProp           = serializedObject.FindProperty("_spawnCooldown");
+            _minEnemyDistanceProp        = serializedObject.FindProperty("_minEnemyDistance");
+            _autoDiscoverProp            = serializedObject.FindProperty("_autoDiscoverSpawnPoints");
+            _spawnPointsProp             = serializedObject.FindProperty("_spawnPoints");
+            _autoRespawnProp             = serializedObject.FindProperty("_autoRespawn");
+            _respawnDelayProp            = serializedObject.FindProperty("_respawnDelay");
         }
-        
+
         public override void OnInspectorGUI()
         {
-            // Mettre à jour les données sérialisées
+            if (UdonSharpGUI.DrawDefaultUdonSharpBehaviourHeader(target)) return;
+
             serializedObject.Update();
-            
-            // Dessiner l'inspecteur par défaut
-            DrawDefaultInspector();
-            
-            GUILayout.Space(10);
-            
-            // Section Auto-Discover avec bouton de refresh
-            if (_autoDiscoverProp.boolValue)
+
+            // =================================================================
+            // RUNTIME STATUS
+            // =================================================================
+            if (Application.isPlaying)
             {
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField("Auto Discover Activé", EditorStyles.boldLabel);
-                
-                EditorGUILayout.HelpBox(
-                    "La liste des spawn points sera automatiquement remplie au runtime.\n" +
-                    "Cliquez sur 'Refresh Spawn Points' pour mettre à jour la liste maintenant.",
-                    MessageType.Info
-                );
-                
-                GUILayout.Space(5);
-                
-                // Bouton pour rafraîchir la liste
-                if (GUILayout.Button("🔄 Refresh Spawn Points", GUILayout.Height(30)))
+                EditorGUILayout.BeginVertical(EditorStyles.helpBox);
+                EditorGUILayout.LabelField("RUNTIME STATUS", EditorStyles.boldLabel);
+                EditorGUILayout.LabelField(
+                    $"Mode : {(_teamManagerProp.objectReferenceValue != null ? "Team-based" : "FFA")}",
+                    EditorStyles.miniLabel);
+                EditorGUILayout.LabelField(
+                    $"Spawn points actifs : {_spawnPointsProp.arraySize}",
+                    EditorStyles.miniLabel);
+                EditorGUILayout.EndVertical();
+                GUILayout.Space(4);
+            }
+
+            // =================================================================
+            // RÉFÉRENCES
+            // =================================================================
+            _refsOpen = Section("RÉFÉRENCES", _refsOpen, () =>
+            {
+                EditorGUILayout.PropertyField(_teamManagerProp,
+                    new GUIContent("Team Manager", "Optionnel — laisser vide pour le mode FFA."));
+
+                bool isFFA = _teamManagerProp.objectReferenceValue == null;
+                EditorGUILayout.LabelField(
+                    isFFA ? "→ Mode : FFA (pas de TeamManager)" : "→ Mode : Team-based",
+                    EditorStyles.miniLabel);
+            });
+
+            // =================================================================
+            // SPAWN SETTINGS
+            // =================================================================
+            _settingsOpen = Section("SPAWN SETTINGS", _settingsOpen, () =>
+            {
+                EditorGUILayout.PropertyField(_spawnStrategyProp,
+                    new GUIContent("Stratégie", "Random / Sequential / LeastRecent / Farthest"));
+                EditorGUILayout.PropertyField(_spawnProtectionDurationProp,
+                    new GUIContent("Protection spawn (s)",
+                        "Durée d'invincibilité après spawn."));
+                EditorGUILayout.PropertyField(_spawnCooldownProp,
+                    new GUIContent("Cooldown spawn (s)",
+                        "Délai minimum entre deux spawns au même point."));
+                EditorGUILayout.PropertyField(_minEnemyDistanceProp,
+                    new GUIContent("Distance min ennemis (m)",
+                        "Distance minimum entre spawn et ennemis. 0 = désactivé."));
+            });
+
+            // =================================================================
+            // SPAWN POINTS
+            // =================================================================
+            _pointsOpen = Section("SPAWN POINTS", _pointsOpen, () =>
+            {
+                EditorGUILayout.PropertyField(_autoDiscoverProp,
+                    new GUIContent("Auto Discover",
+                        "Trouve automatiquement tous les M2922_SpawnPoint dans la scène."));
+
+                if (_autoDiscoverProp.boolValue)
                 {
-                    RefreshSpawnPoints();
+                    EditorGUILayout.HelpBox(
+                        $"La liste sera remplie automatiquement au runtime.\n" +
+                        $"Points trouvés en scène : {_spawnPointsProp.arraySize}",
+                        MessageType.None);
+
+                    if (GUILayout.Button("Refresh maintenant (Edit mode)"))
+                        RefreshSpawnPoints();
                 }
-                
-                // Afficher le nombre de spawn points trouvés
-                int spawnCount = _spawnPointsProp.arraySize;
-                EditorGUILayout.LabelField("Spawn Points Trouvés:", spawnCount.ToString(), EditorStyles.miniLabel);
-                
-                EditorGUILayout.EndVertical();
-            }
-            else
+                else
+                {
+                    EditorGUILayout.PropertyField(_spawnPointsProp,
+                        new GUIContent("Spawn Points"));
+                }
+            });
+
+            // =================================================================
+            // RESPAWN
+            // =================================================================
+            _respawnOpen = Section("RESPAWN", _respawnOpen, () =>
             {
-                EditorGUILayout.BeginVertical("box");
-                EditorGUILayout.LabelField("Mode Manuel", EditorStyles.boldLabel);
-                EditorGUILayout.HelpBox(
-                    "Assignez manuellement les spawn points dans la liste 'Spawn Points'.\n" +
-                    "Ou activez 'Auto Discover' pour remplir automatiquement.",
-                    MessageType.Info
-                );
-                EditorGUILayout.EndVertical();
-            }
-            
-            // Appliquer les modifications
+                EditorGUILayout.PropertyField(_autoRespawnProp,
+                    new GUIContent("Auto Respawn"));
+                EditorGUI.BeginDisabledGroup(!_autoRespawnProp.boolValue);
+                EditorGUILayout.PropertyField(_respawnDelayProp,
+                    new GUIContent("Délai respawn (s)"));
+                EditorGUI.EndDisabledGroup();
+            });
+
+            DrawVisualDebug();
             serializedObject.ApplyModifiedProperties();
         }
-        
-        /// <summary>
-        /// Rafraîchit la liste des spawn points dans l'éditeur
-        /// </summary>
+
+        // =====================================================================
+        // HELPERS
+        // =====================================================================
+
         private void RefreshSpawnPoints()
         {
-            // Trouver tous les M2922_SpawnPoint dans la scène
-            M2922.Spawning.M2922_SpawnPoint[] foundSpawns = 
-                GameObject.FindObjectsOfType<M2922.Spawning.M2922_SpawnPoint>();
-            
-            // Mettre à jour la liste
+            M2922_SpawnPoint[] found = Object.FindObjectsOfType<M2922_SpawnPoint>();
             _spawnPointsProp.ClearArray();
-            _spawnPointsProp.arraySize = foundSpawns.Length;
-            
-            for (int i = 0; i < foundSpawns.Length; i++)
-            {
-                _spawnPointsProp.GetArrayElementAtIndex(i).objectReferenceValue = foundSpawns[i];
-            }
-            
+            _spawnPointsProp.arraySize = found.Length;
+            for (int i = 0; i < found.Length; i++)
+                _spawnPointsProp.GetArrayElementAtIndex(i).objectReferenceValue = found[i];
+
             serializedObject.ApplyModifiedProperties();
-            
-            Debug.Log($"[M2922 SpawnManager] Trouvé et assigné {foundSpawns.Length} spawn points");
+            Debug.Log($"[M2922_SpawnManager] {found.Length} spawn points trouvés et assignés.");
         }
     }
 }

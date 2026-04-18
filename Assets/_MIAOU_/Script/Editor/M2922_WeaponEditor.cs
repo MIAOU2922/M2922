@@ -7,7 +7,7 @@ using M2922.Core;
 namespace M2922.Editor
 {
     [CustomEditor(typeof(M2922_Weapon))]
-    public class M2922_WeaponEditor : UnityEditor.Editor
+    public class M2922_WeaponEditor : M2922_BaseEditor
     {
         // ── Identity ──────────────────────────────────────────────────────────
         private SerializedProperty _weaponDisplayNameProp;
@@ -19,6 +19,8 @@ namespace M2922.Editor
         private SerializedProperty _critMultiplierProp;
 
         // ── Fire ──────────────────────────────────────────────────────────────
+        private SerializedProperty _isAutoFireProp;
+        private SerializedProperty _muzzlePointProp;
         private SerializedProperty _fireRateProp;
         private SerializedProperty _rangeProp;
         private SerializedProperty _hitLayersProp;
@@ -30,8 +32,8 @@ namespace M2922.Editor
 
         // ── Ammo ──────────────────────────────────────────────────────────────
         private SerializedProperty _baseMagSizeProp;
-        private SerializedProperty _baseReserveSizeProp;
-        private SerializedProperty _infiniteAmmoProp;
+        private SerializedProperty _baseReserveSizeProp;        private SerializedProperty _spawnMagAmmoProp;
+        private SerializedProperty _spawnReserveAmmoProp;        private SerializedProperty _infiniteAmmoProp;
 
         // ── Reload ────────────────────────────────────────────────────────────
         private SerializedProperty _reloadModeProp;
@@ -46,10 +48,13 @@ namespace M2922.Editor
         private SerializedProperty _resetSpreadOnReloadProp;
 
         // ── VFX / SFX ─────────────────────────────────────────────────────────
-        private SerializedProperty _muzzleFlashProp;
-        private SerializedProperty _fireAudioProp;
+        private SerializedProperty _muzzleFlashProp;        private SerializedProperty _casingEjectionProp;        private SerializedProperty _fireAudioProp;
         private SerializedProperty _reloadAudioProp;
         private SerializedProperty _emptyAudioProp;
+        private SerializedProperty _chargeAudioProp;
+
+        // ── Charge ────────────────────────────────────────────────────────────
+        private SerializedProperty _chargeTimeProp;
 
         // ── UI state ──────────────────────────────────────────────────────────
         private bool _damageOpen   = true;
@@ -67,13 +72,16 @@ namespace M2922.Editor
 
         // ─────────────────────────────────────────────────────────────────────
 
-        private void OnEnable()
+        protected override void OnEnable()
         {
+            base.OnEnable();
             _weaponDisplayNameProp    = serializedObject.FindProperty("_weaponDisplayName");
             _weaponTypeProp           = serializedObject.FindProperty("_weaponType");
             _damageTypesProp          = serializedObject.FindProperty("_damageTypes");
             _baseDamageAmountsProp    = serializedObject.FindProperty("_baseDamageAmounts");
             _critMultiplierProp       = serializedObject.FindProperty("_critMultiplier");
+            _isAutoFireProp           = serializedObject.FindProperty("_isAutoFire");
+            _muzzlePointProp          = serializedObject.FindProperty("_muzzlePoint");
             _fireRateProp             = serializedObject.FindProperty("_fireRate");
             _rangeProp                = serializedObject.FindProperty("_range");
             _hitLayersProp            = serializedObject.FindProperty("_hitLayers");
@@ -82,6 +90,8 @@ namespace M2922.Editor
             _projectileSpeedProp      = serializedObject.FindProperty("_projectileSpeed");
             _baseMagSizeProp          = serializedObject.FindProperty("_baseMagSize");
             _baseReserveSizeProp      = serializedObject.FindProperty("_baseReserveSize");
+            _spawnMagAmmoProp         = serializedObject.FindProperty("_spawnMagAmmo");
+            _spawnReserveAmmoProp     = serializedObject.FindProperty("_spawnReserveAmmo");
             _infiniteAmmoProp         = serializedObject.FindProperty("_infiniteAmmo");
             _reloadModeProp           = serializedObject.FindProperty("_reloadMode");
             _autoReloadDelayProp      = serializedObject.FindProperty("_autoReloadDelay");
@@ -92,9 +102,12 @@ namespace M2922.Editor
             _spreadRecoveryRateProp   = serializedObject.FindProperty("_spreadRecoveryRate");
             _resetSpreadOnReloadProp  = serializedObject.FindProperty("_resetSpreadOnReload");
             _muzzleFlashProp          = serializedObject.FindProperty("_muzzleFlash");
+            _casingEjectionProp       = serializedObject.FindProperty("_casingEjection");
             _fireAudioProp            = serializedObject.FindProperty("_fireAudio");
             _reloadAudioProp          = serializedObject.FindProperty("_reloadAudio");
             _emptyAudioProp           = serializedObject.FindProperty("_emptyAudio");
+            _chargeAudioProp          = serializedObject.FindProperty("_chargeAudio");
+            _chargeTimeProp           = serializedObject.FindProperty("_chargeTime");
         }
 
         public override void OnInspectorGUI()
@@ -145,16 +158,29 @@ namespace M2922.Editor
                         $"Spread: {weapon.CurrentSpread:F2}° / {weapon.MaxSpread:F2}°");
                 }
 
+                // Charge bar
+                if (weapon.ChargeTime > 0f)
+                {
+                    Rect chargeRect = EditorGUILayout.GetControlRect(false, 18f);
+                    string chargeLabel = weapon.IsCharging
+                        ? $"Charge: {weapon.ChargeProgress * 100f:F0}%  ({weapon.ChargeTime:F1}s)"
+                        : "Charge: --- (gâchette relâchée)";
+                    EditorGUI.ProgressBar(chargeRect, weapon.ChargeProgress, chargeLabel);
+                }
+
                 EditorGUILayout.LabelField("Reloading",   weapon.IsReloading.ToString());
                 EditorGUILayout.LabelField("Can Fire",    weapon.CanFire.ToString());
                 EditorGUILayout.LabelField("Total DPS",   $"{weapon.TotalDamage * weapon.FireRate:F1} dmg/s");
 
                 GUILayout.Space(4);
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Force Reload")) weapon.TriggerReload();
-                if (GUILayout.Button("+30 ammo"))     weapon.AddAmmo(30);
-                if (GUILayout.Button("Infinite ON"))  weapon.SetInfiniteAmmo(true);
-                if (GUILayout.Button("Infinite OFF")) weapon.SetInfiniteAmmo(false);
+                if (GUILayout.Button("Force Reload"))    weapon.TriggerReload();
+                if (GUILayout.Button("+30 ammo"))        weapon.AddAmmo(30);
+                if (GUILayout.Button("Restore spawn"))   weapon.RestoreSpawnAmmo();
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.BeginHorizontal();
+                if (GUILayout.Button("Infinite ON"))     weapon.SetInfiniteAmmo(true);
+                if (GUILayout.Button("Infinite OFF"))    weapon.SetInfiniteAmmo(false);
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.BeginHorizontal();
                 if (GUILayout.Button("Spread ×2"))    weapon.SetSpreadMultiplier(2f);
@@ -212,7 +238,25 @@ namespace M2922.Editor
             // =================================================================
             _fireOpen = Section("FIRE", _fireOpen, () =>
             {
+                EditorGUILayout.PropertyField(_isAutoFireProp,     new GUIContent("Auto Fire",
+                    "true = tir automatique (maintenir la gâchette) | false = semi-auto (un coup par appui)"));
+                EditorGUILayout.PropertyField(_muzzlePointProp,    new GUIContent("Muzzle Point",
+                    "Transform au bout du canon. Origine du raycast et des projectiles.\n" +
+                    "Si vide : utilise le transform de cet objet."));
+                if (_muzzlePointProp.objectReferenceValue == null)
+                    EditorGUILayout.HelpBox(
+                        "Aucun Muzzle Point assigné — le tir part de l'origine du GameObject.",
+                        MessageType.Warning);
                 EditorGUILayout.PropertyField(_fireRateProp,       new GUIContent("Fire Rate (shots/s)"));
+                EditorGUILayout.PropertyField(_chargeTimeProp,      new GUIContent("Charge Time (s)",
+                    "Durée de maintien de la gâchette avant le tir. 0 = tir immédiat."));
+
+                if (_chargeTimeProp.floatValue > 0f)
+                    EditorGUILayout.HelpBox(
+                        $"Arme à charge : maintenir {_chargeTimeProp.floatValue:F1}s avant de tirer. " +
+                        "La gâchette doit rester enfoncée. Si on relâche avant, la charge est annulée.",
+                        MessageType.Info);
+
                 EditorGUILayout.PropertyField(_useProjectileProp,  new GUIContent("Use Projectile (vs Raycast)"));
 
                 if (!_useProjectileProp.boolValue)
@@ -249,8 +293,23 @@ namespace M2922.Editor
                 EditorGUILayout.PropertyField(_infiniteAmmoProp,     new GUIContent("Infinite Ammo"));
                 if (!_infiniteAmmoProp.boolValue)
                 {
-                    EditorGUILayout.PropertyField(_baseMagSizeProp,     new GUIContent("Base Mag Size"));
-                    EditorGUILayout.PropertyField(_baseReserveSizeProp, new GUIContent("Base Reserve Size"));
+                    EditorGUILayout.PropertyField(_baseMagSizeProp,       new GUIContent("Base Mag Size"));
+                    EditorGUILayout.PropertyField(_baseReserveSizeProp,   new GUIContent("Base Reserve Size"));
+                    GUILayout.Space(4);
+                    EditorGUILayout.LabelField("Spawn / Retour à l'origine", EditorStyles.miniLabel);
+                    EditorGUILayout.PropertyField(_spawnMagAmmoProp,       new GUIContent("Spawn Mag Ammo",
+                        "Munitions dans le chargeur au spawn. -1 = plein."));
+                    EditorGUILayout.PropertyField(_spawnReserveAmmoProp,   new GUIContent("Spawn Reserve Ammo",
+                        "Munitions en réserve au spawn. -1 = plein."));
+
+                    int spawnMag     = _spawnMagAmmoProp.intValue;
+                    int spawnReserve = _spawnReserveAmmoProp.intValue;
+                    int magSize      = _baseMagSizeProp.intValue;
+                    int reserveSize  = _baseReserveSizeProp.intValue;
+                    string magLabel  = spawnMag     < 0 ? $"{magSize} (plein)"     : $"{Mathf.Clamp(spawnMag, 0, magSize)}";
+                    string resLabel  = spawnReserve < 0 ? $"{reserveSize} (plein)" : $"{Mathf.Clamp(spawnReserve, 0, reserveSize)}";
+                    EditorGUILayout.LabelField($"→ Spawn avec : {magLabel} / {resLabel} reserve",
+                        EditorStyles.miniLabel);
                 }
             });
 
@@ -321,12 +380,17 @@ namespace M2922.Editor
             // =================================================================
             _vfxOpen = Section("VFX / SFX", _vfxOpen, () =>
             {
-                EditorGUILayout.PropertyField(_muzzleFlashProp,  new GUIContent("Muzzle Flash"));
+                EditorGUILayout.PropertyField(_muzzleFlashProp,    new GUIContent("Muzzle Flash",
+                    "Particle system du flash. Orienté automatiquement dans la direction du tir."));
+                EditorGUILayout.PropertyField(_casingEjectionProp, new GUIContent("Casing Ejection",
+                    "Particle system de la douille. Joué tel quel (rotation libre, orienté en scene)."));
                 EditorGUILayout.PropertyField(_fireAudioProp,    new GUIContent("Fire Sound"));
+                EditorGUILayout.PropertyField(_chargeAudioProp,  new GUIContent("Charge Sound"));
                 EditorGUILayout.PropertyField(_reloadAudioProp,  new GUIContent("Reload Sound"));
                 EditorGUILayout.PropertyField(_emptyAudioProp,   new GUIContent("Empty Sound"));
             });
 
+            DrawVisualDebug();
             serializedObject.ApplyModifiedProperties();
         }
 
@@ -430,23 +494,5 @@ namespace M2922.Editor
             }
         }
 
-        // =====================================================================
-        // HELPERS
-        // =====================================================================
-
-        private static bool Section(string title, bool open, System.Action content)
-        {
-            EditorGUILayout.BeginVertical(EditorStyles.helpBox);
-            open = EditorGUILayout.Foldout(open, title, true, EditorStyles.foldoutHeader);
-            if (open)
-            {
-                GUILayout.Space(2);
-                content();
-                GUILayout.Space(2);
-            }
-            EditorGUILayout.EndVertical();
-            GUILayout.Space(2);
-            return open;
-        }
     }
 }
