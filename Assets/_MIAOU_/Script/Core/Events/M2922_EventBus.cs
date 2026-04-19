@@ -247,8 +247,8 @@ namespace M2922.Core
             if (Networking.IsOwner(gameObject))
                 RequestSerialization();
             
-            // Propager via réseau
-            SendCustomNetworkEvent(NetworkEventTarget.All, $"_Network{eventType}");
+            // Propager via réseau (Others : le local a déjà reçu via Publish ci-dessus)
+            SendCustomNetworkEvent(NetworkEventTarget.Others, $"_Network{eventType}");
             
             this.VerboseLog($"Network publishing {eventType}");
         }
@@ -282,6 +282,42 @@ namespace M2922.Core
                 if (_pool[i] == slot) return i;
             return -1;
         }
+
+        // =====================================================================
+        // NETWORK STUBS — requis par SendCustomNetworkEvent
+        // Appelés sur les clients distants après PublishNetwork()
+        // =====================================================================
+        public void _Network0()  { Publish(EventType.OnGameStarted,          _lastSlot[0]);  }
+        public void _Network1()  { Publish(EventType.OnGameEnded,            _lastSlot[1]);  }
+        public void _Network2()  { Publish(EventType.OnRoundStarted,         _lastSlot[2]);  }
+        public void _Network3()  { Publish(EventType.OnRoundEnded,           _lastSlot[3]);  }
+        public void _Network10() { Publish(EventType.OnPlayerJoined,         _lastSlot[10]); }
+        public void _Network11() { Publish(EventType.OnPlayerLeft,           _lastSlot[11]); }
+        public void _Network12() { Publish(EventType.OnPlayerSpawned,        _lastSlot[12]); }
+        public void _Network13() { Publish(EventType.OnPlayerDied,           _lastSlot[13]); }
+        public void _Network14() { Publish(EventType.OnPlayerRespawned,      _lastSlot[14]); }
+        public void _Network15() { Publish(EventType.OnPlayerDamaged,        _lastSlot[15]); }
+        public void _Network16() { Publish(EventType.OnPlayerHealed,         _lastSlot[16]); }
+        public void _Network20() { Publish(EventType.OnWeaponFired,          _lastSlot[20]); }
+        public void _Network21() { Publish(EventType.OnWeaponReloaded,       _lastSlot[21]); }
+        public void _Network22() { Publish(EventType.OnWeaponEquipped,       _lastSlot[22]); }
+        public void _Network23() { Publish(EventType.OnWeaponDropped,        _lastSlot[23]); }
+        public void _Network24() { Publish(EventType.OnPlayerKilled,         _lastSlot[24]); }
+        public void _Network25() { Publish(EventType.OnDamageDealt,          _lastSlot[25]); }
+        public void _Network26() { Publish(EventType.OnHeadshotScored,       _lastSlot[26]); }
+        public void _Network30() { Publish(EventType.OnTeamChanged,          _lastSlot[30]); }
+        public void _Network31() { Publish(EventType.OnTeamScoreChanged,     _lastSlot[31]); }
+        public void _Network32() { Publish(EventType.OnTeamWon,              _lastSlot[32]); }
+        public void _Network40() { Publish(EventType.OnVehicleEntered,       _lastSlot[40]); }
+        public void _Network41() { Publish(EventType.OnVehicleExited,        _lastSlot[41]); }
+        public void _Network42() { Publish(EventType.OnVehicleDestroyed,     _lastSlot[42]); }
+        public void _Network43() { Publish(EventType.OnVehicleDamaged,       _lastSlot[43]); }
+        public void _Network50() { Publish(EventType.OnObjectiveCaptured,    _lastSlot[50]); }
+        public void _Network51() { Publish(EventType.OnObjectiveLost,        _lastSlot[51]); }
+        public void _Network52() { Publish(EventType.OnObjectiveNeutralized, _lastSlot[52]); }
+        public void _Network60() { Publish(EventType.OnPowerupCollected,     _lastSlot[60]); }
+        public void _Network61() { Publish(EventType.OnPowerupExpired,       _lastSlot[61]); }
+        public void _Network62() { Publish(EventType.OnPowerupSpawned,       _lastSlot[62]); }
     }
     
     /// <summary>

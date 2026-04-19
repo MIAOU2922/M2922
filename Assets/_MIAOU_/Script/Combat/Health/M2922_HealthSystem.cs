@@ -54,15 +54,11 @@ namespace M2922.Combat
         }
 
         // === METHODE ===
-        protected override void Awake()
-        {
-            _maxHealth = _baseMaxHealth;
-            _health = _maxHealth;
-        }
-
         protected override void Start()
         {
             base.Start();
+            _maxHealth = _baseMaxHealth;
+            _health    = _maxHealth;
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR

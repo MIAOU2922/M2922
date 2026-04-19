@@ -77,15 +77,11 @@ namespace M2922.Combat
         }
 
         // === METHODE ===
-        protected override void Awake()
-        {
-            _maxArmorPoints = _baseMaxArmorPoints;
-            _armorPoints = _maxArmorPoints;
-        }
-
         protected override void Start()
         {
             base.Start();
+            _maxArmorPoints = _baseMaxArmorPoints;
+            _armorPoints    = _maxArmorPoints;
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR

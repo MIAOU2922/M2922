@@ -16,18 +16,21 @@ namespace M2922.Entity.Player
         public M2922_HealthSystem HealthSystem; // null = pas de santé (invincible)
         public M2922_ArmorSystem ArmorSystem;   // null = pas d'armure
         public M2922_BuffSystem  BuffSystem;    // null = pas de buffs
+        public M2922_HitboxSystem HitboxSystem; // null = pas de hitboxes (non touchable physiquement)
 
         // === HELPERS ===
-        public bool HasHealth => HealthSystem != null;
-        public bool HasArmor => ArmorSystem != null;
-        public bool HasBuffs  => BuffSystem  != null;
+        public bool HasHealth   => HealthSystem  != null;
+        public bool HasArmor    => ArmorSystem   != null;
+        public bool HasBuffs    => BuffSystem    != null;
+        public bool HasHitboxes => HitboxSystem  != null;
 
         // === HELPER METHODS ===
         private void TryFindSystems()
         {
-            if (HealthSystem == null) HealthSystem = GetComponent<M2922_HealthSystem>();
-            if (ArmorSystem == null) ArmorSystem = GetComponent<M2922_ArmorSystem>();
-            if (BuffSystem  == null) BuffSystem  = GetComponent<M2922_BuffSystem>();
+            if (HealthSystem  == null) HealthSystem  = GetComponent<M2922_HealthSystem>();
+            if (ArmorSystem   == null) ArmorSystem   = GetComponent<M2922_ArmorSystem>();
+            if (BuffSystem    == null) BuffSystem    = GetComponent<M2922_BuffSystem>();
+            if (HitboxSystem  == null) HitboxSystem  = GetComponent<M2922_HitboxSystem>();
         }
 
         // === IDamageable (inline) ===

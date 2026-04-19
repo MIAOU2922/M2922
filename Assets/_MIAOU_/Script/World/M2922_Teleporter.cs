@@ -124,7 +124,8 @@ namespace M2922.World
         // =====================================================================
         // RUNTIME
         // =====================================================================
-        private float _lastTeleportTime = -999f;
+        private float _lastPlayerTeleportTime = -999f;
+        private float _lastEntityTeleportTime = -999f;
         private VRCPlayerApi _pendingPlayer;
         private Transform    _pendingEntityTransform;
 
@@ -228,10 +229,10 @@ namespace M2922.World
                 this.Log("[Teleporter] Destination non assignée !");
                 return;
             }
-            if (Time.time - _lastTeleportTime < _cooldown) return;
+            if (Time.time - _lastPlayerTeleportTime < _cooldown) return;
 
-            _lastTeleportTime  = Time.time;
-            _pendingPlayer     = player;
+            _lastPlayerTeleportTime = Time.time;
+            _pendingPlayer          = player;
 
             PlayDepartEffect();
             PlayTeleportSound();
@@ -249,9 +250,9 @@ namespace M2922.World
                 this.Log("[Teleporter] Destination non assignée !");
                 return;
             }
-            if (Time.time - _lastTeleportTime < _cooldown) return;
+            if (Time.time - _lastEntityTeleportTime < _cooldown) return;
 
-            _lastTeleportTime       = Time.time;
+            _lastEntityTeleportTime = Time.time;
             _pendingEntityTransform = entityTransform;
 
             PlayDepartEffect();

@@ -3,6 +3,8 @@ using UnityEngine;
 using VRC.SDKBase;
 using M2922.Core;
 using M2922.Entity;
+using M2922.Entity.Player;
+using M2922.Entity.Prop;
 using EventType = M2922.Core.EventType;
 
 namespace M2922.Combat
@@ -278,22 +280,49 @@ namespace M2922.Combat
             Deactivate();
         }
 
+        // Détection des hitbox en mode trigger (Is Trigger = true sur le Collider).
+        // Nécessaire car les hitbox joueur sont des triggers pour ne pas pousser physiquement.
+        private void OnTriggerEnter(Collider other)
+        {
+            if (_hasExploded) return;
+
+            Vector3 contactPoint = other.ClosestPoint(transform.position);
+
+            PlayImpactEffects(contactPoint);
+
+            if (_explosionRadius > 0f)
+                ExplodeAtPosition(contactPoint);
+            else
+                ApplyDirectHit(other, contactPoint, (transform.position - contactPoint).normalized);
+
+            Deactivate();
+        }
+
         // =====================================================================
         // DAMAGE INTERNALS
         // =====================================================================
 
         private void ApplyDirectHit(Collider hitCollider, Vector3 hitPoint, Vector3 hitNormal)
         {
-            bool isCrit = hitCollider.GetComponent<M2922_CritZone>() != null;
+            M2922_CritZone _cz = hitCollider.GetComponent<M2922_CritZone>();
+            bool isCrit = _cz != null ? true : false;
 
-            // Fonctionne pour tout type d'entité — victimId = -1 si le GO n'a pas de M2922_Entity (sac de sable…)
-            M2922_Entity target = hitCollider.GetComponentInParent<M2922_Entity>();
-            int victimId = target != null ? target.EntityId : -1;
+            // UdonSharp : GetComponentInParent<T> pour UdonSharpBehaviour n'est pas fiable.
+            // On utilise M2922_HitboxOwner placé sur le même GO que le collider.
+            M2922_HitboxOwner owner = hitCollider.GetComponent<M2922_HitboxOwner>();
+            bool hasOwner = owner != null ? true : false;
+            M2922_PlayerController pc = hasOwner ? owner.PlayerController : null;
+            bool isPC = pc != null ? true : false;
+            M2922_Prop prop = hasOwner ? owner.Prop : null;
+            bool isProp = prop != null ? true : false;
+            int victimId = isPC ? pc.EntityId : (isProp ? prop.EntityId : -1);
+            string targetName = isPC ? pc.EntityName : (isProp ? prop.EntityName : hitCollider.name);
 
             float distance = Vector3.Distance(transform.position, hitPoint);
             PublishAllDamageEvents(victimId, isCrit, 1f, hitPoint, hitNormal, distance);
+            ApplyDamageTo(owner, isCrit, 1f);
 
-            this.VerboseLog($"[Projectile] Impact sur {(target != null ? target.EntityName : hitCollider.name)} | Crit: {isCrit}");
+            this.VerboseLog($"[Projectile] Impact sur {targetName} | Crit: {isCrit}");
         }
 
         /// <summary>
@@ -302,7 +331,7 @@ namespace M2922.Combat
         /// </summary>
         private void ExplodeAtPosition(Vector3 center)
         {
-            Collider[] hitColliders = Physics.OverlapSphere(center, _explosionRadius, _hitLayers);
+            Collider[] hitColliders = Physics.OverlapSphere(center, _explosionRadius, _hitLayers, QueryTriggerInteraction.Collide);
 
             this.VerboseLog($"[Projectile] Explosion @ {center} | R:{_explosionRadius}m | Cibles:{hitColliders.Length}");
 
@@ -312,14 +341,21 @@ namespace M2922.Combat
                 float falloff = 1f - Mathf.Clamp01(dist / _explosionRadius);
                 if (falloff <= 0f) continue;
 
-                // Fonctionne pour tout type d'entité — victimId = -1 si aucune M2922_Entity
-                M2922_Entity target = hitColliders[i].GetComponentInParent<M2922_Entity>();
-                int victimId = target != null ? target.EntityId : -1;
+                // UdonSharp : utiliser M2922_HitboxOwner sur le même GO que le collider.
+                M2922_HitboxOwner ownerEx = hitColliders[i].GetComponent<M2922_HitboxOwner>();
+                bool hasOwnerEx = ownerEx != null ? true : false;
+                M2922_PlayerController pcEx = hasOwnerEx ? ownerEx.PlayerController : null;
+                bool isPCEx = pcEx != null ? true : false;
+                M2922_Prop propEx = hasOwnerEx ? ownerEx.Prop : null;
+                bool isPropEx = propEx != null ? true : false;
+                int victimId = isPCEx ? pcEx.EntityId : (isPropEx ? propEx.EntityId : -1);
+                string exName = isPCEx ? pcEx.EntityName : (isPropEx ? propEx.EntityName : hitColliders[i].name);
 
                 Vector3 dir = (hitColliders[i].transform.position - center).normalized;
                 PublishAllDamageEvents(victimId, false, falloff, center, dir, dist);
+                ApplyDamageTo(ownerEx, false, falloff);
 
-                this.VerboseLog($"[Projectile] Explosion hit {(target != null ? target.EntityName : hitColliders[i].name)} | Falloff:{falloff:F2} | Dist:{dist:F1}m");
+                this.VerboseLog($"[Projectile] Explosion hit {exName} | Falloff:{falloff:F2} | Dist:{dist:F1}m");
             }
         }
 
@@ -327,6 +363,42 @@ namespace M2922.Combat
         /// Publie un OnDamageDealt par type configuré.
         /// <param name="damageScale">Multiplicateur appliqué en plus (ex: falloff d'explosion).</param>
         /// </summary>
+        // Applique les dégâts directement sur la cible (PlayerController ou Prop).
+        // Les events sont publiés séparément via PublishAllDamageEvents.
+        // Reçoit l'entité déjà trouvée via GetComponentInParent<M2922_Entity>().
+        // Utilise des ternaires pour les null-checks UdonSharpBehaviour (pattern sûr en Udon).
+        private void ApplyDamageTo(M2922_HitboxOwner owner, bool isCrit, float damageScale)
+        {
+            bool hasOwner = owner != null ? true : false;
+            if (!hasOwner) return;
+            if (_activeDamageTypes == null || _activeBaseDamageAmounts == null) return;
+            float critMult = isCrit ? _activeCritMultiplier : 1f;
+            int count = Mathf.Min(_activeDamageTypes.Length, _activeBaseDamageAmounts.Length);
+
+            M2922_PlayerController pc = owner.PlayerController;
+            bool isPC = pc != null ? true : false;
+            if (isPC)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    float dmg = _activeBaseDamageAmounts[i] * _activeDamageMultiplier * damageScale * critMult;
+                    if (dmg > 0f) pc.TakeDamage(dmg, _attackerId, _activeDamageTypes[i]);
+                }
+                return;
+            }
+
+            M2922_Prop prop = owner.Prop;
+            bool isProp = prop != null ? true : false;
+            if (isProp)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    float dmg = _activeBaseDamageAmounts[i] * _activeDamageMultiplier * damageScale * critMult;
+                    if (dmg > 0f) prop.TakeDamage(dmg, _attackerId, _activeDamageTypes[i]);
+                }
+            }
+        }
+
         private void PublishAllDamageEvents(
             int victimId, bool isHeadshot, float damageScale,
             Vector3 hitPoint, Vector3 hitNormal, float distance)
