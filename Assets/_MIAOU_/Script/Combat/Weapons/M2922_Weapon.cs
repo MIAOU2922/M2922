@@ -3,6 +3,8 @@ using UnityEngine;
 using VRC.SDKBase;
 using M2922.Core;
 using M2922.Entity;
+using M2922.Entity.Player;
+using M2922.Entity.Prop;
 using EventType = M2922.Core.EventType;
 
 namespace M2922.Combat
@@ -639,17 +641,62 @@ namespace M2922.Combat
         private void FireRaycast(Transform origin, Vector3 direction)
         {
             RaycastHit hit;
-            if (!Physics.Raycast(origin.position, direction, out hit, _range, _hitLayers)) return;
+            if (!Physics.Raycast(origin.position, direction, out hit, _range, _hitLayers, QueryTriggerInteraction.Collide)) return;
 
-            bool isCrit = hit.collider.GetComponent<M2922_CritZone>() != null;
+            // Stocker le résultat avant de comparer — null-check inline sur UdonSharpBehaviour crash en Udon.
+            M2922_CritZone _cz = hit.collider.GetComponent<M2922_CritZone>();
+            bool isCrit = _cz != null ? true : false;
 
-            // Fonctionne pour tout type d'entité (joueur, véhicule, structure…)
-            // Si le collider appartient à un GO sans M2922_Entity (sac de sable...) → victimId = -1
-            M2922_Entity target = hit.collider.GetComponentInParent<M2922_Entity>();
-            int victimId = target != null ? target.EntityId : -1;
+            // UdonSharp : GetComponentInParent<UdonSharpBehaviour> n'est pas fiable.
+            // On utilise GetComponent<M2922_HitboxOwner>() sur le même GO que le collider.
+            M2922_HitboxOwner owner = hit.collider.GetComponent<M2922_HitboxOwner>();
+            bool hasOwner = owner != null ? true : false;
+            M2922_PlayerController pcVictim = hasOwner ? owner.PlayerController : null;
+            bool isPCVictim = pcVictim != null ? true : false;
+            M2922_Prop propVictim = hasOwner ? owner.Prop : null;
+            bool isPropVictim = propVictim != null ? true : false;
+            int victimId = isPCVictim ? pcVictim.EntityId : (isPropVictim ? propVictim.EntityId : -1);
+            string targetName = isPCVictim ? pcVictim.EntityName : (isPropVictim ? propVictim.EntityName : hit.collider.name);
 
             PublishAllDamageEvents(victimId, isCrit, 1f, hit.point, hit.normal, hit.distance);
-            this.VerboseLog($"[Weapon] Raycast hit {(target != null ? target.EntityName : hit.collider.name)} | Crit: {isCrit}");
+            ApplyDamageTo(owner, isCrit, 1f);
+            this.VerboseLog($"[Weapon] Raycast hit {targetName} | Crit: {isCrit}");
+        }
+
+        // Applique les dégâts directement sur la cible (PlayerController ou Prop).
+        // Les events sont publiés séparément via PublishAllDamageEvents.
+        // Reçoit l'entité déjà trouvée via GetComponentInParent<M2922_Entity>().
+        // Utilise des ternaires pour les null-checks UdonSharpBehaviour (pattern sûr en Udon).
+        private void ApplyDamageTo(M2922_HitboxOwner owner, bool isCrit, float damageScale)
+        {
+            bool hasOwner = owner != null ? true : false;
+            if (!hasOwner) return;
+            if (_damageTypes == null || _effectiveDamageAmounts == null) return;
+            float critMult = isCrit ? _critMultiplier : 1f;
+            int count = Mathf.Min(_damageTypes.Length, _effectiveDamageAmounts.Length);
+
+            M2922_PlayerController pc = owner.PlayerController;
+            bool isPC = pc != null ? true : false;
+            if (isPC)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    float dmg = _effectiveDamageAmounts[i] * damageScale * critMult;
+                    if (dmg > 0f) pc.TakeDamage(dmg, _attackerId, _damageTypes[i]);
+                }
+                return;
+            }
+
+            M2922_Prop prop = owner.Prop;
+            bool isProp = prop != null ? true : false;
+            if (isProp)
+            {
+                for (int i = 0; i < count; i++)
+                {
+                    float dmg = _effectiveDamageAmounts[i] * damageScale * critMult;
+                    if (dmg > 0f) prop.TakeDamage(dmg, _attackerId, _damageTypes[i]);
+                }
+            }
         }
 
         private void FireProjectile(Transform origin, Vector3 direction)
