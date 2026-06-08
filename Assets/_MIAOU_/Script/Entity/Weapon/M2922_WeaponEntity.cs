@@ -34,7 +34,7 @@ namespace M2922.Entity.Weapon
     ///   _returnDelay >= 0 : après ce délai (sec), l'arme retourne à son origine
     ///   _returnDelay  < 0 : permanente là où elle est posée (ReturnToOrigin() reste public)
     /// </summary>
-    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Continuous)]
     public class M2922_WeaponEntity : M2922_Entity
     {
         // =====================================================================

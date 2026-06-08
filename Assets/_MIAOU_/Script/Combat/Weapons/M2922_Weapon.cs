@@ -70,7 +70,7 @@ namespace M2922.Combat
     ///   SetSpreadMultiplier() : buff/debuff multiplicateur du spread (max + per-shot)
     ///   Si _baseMaxSpread = 0 → aucun calcul, toujours droit
     /// </summary>
-    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Continuous)]
     public class M2922_Weapon : M2922_System
     {
         // =====================================================================
