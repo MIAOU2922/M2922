@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.3322064, g: 0.36271724, b: 0.46474224, a: 1}
+  m_IndirectSpecularColor: {r: 0.33220643, g: 0.36271724, b: 0.4647423, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -9972,7 +9972,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &38996065
 Transform:
   m_ObjectHideFlags: 0
@@ -76258,8 +76258,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 92, y: 0}
-  m_SizeDelta: {x: 184, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &500766631
 MonoBehaviour:
@@ -76413,7 +76413,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 16, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &519674350
@@ -86736,7 +86736,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 208, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &666464604
@@ -96665,7 +96665,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 59, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 118, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &736259084
@@ -152705,6 +152705,7 @@ GameObject:
   - component: {fileID: 1279516780}
   - component: {fileID: 1279516779}
   - component: {fileID: 1279516778}
+  - component: {fileID: 1279516785}
   m_Layer: 0
   m_Name: weapon test (3)
   m_TagString: Untagged
@@ -152834,7 +152835,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: c67b51d4693103544ba5a7f949f5b7b2,
     type: 2}
   programSource: {fileID: 11400000, guid: a3d2d26fd6f69b64eb84326e5148ae22, type: 2}
@@ -152893,7 +152894,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: ec283e0a28842474cba0532577276b66,
     type: 2}
   programSource: {fileID: 11400000, guid: 8bd606cb542f7804986ed6b227a90376, type: 2}
@@ -152964,6 +152965,20 @@ MonoBehaviour:
   _reloadAudio: {fileID: 0}
   _emptyAudio: {fileID: 0}
   _chargeAudio: {fileID: 0}
+--- !u!114 &1279516785
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1279516776}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1783056023, guid: 661092b4961be7145bfbe56e1e62337b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  AllowCollisionOwnershipTransfer: 1
+  ForceKinematicOnRemote: 0
 --- !u!1 &1335874546
 GameObject:
   m_ObjectHideFlags: 0
@@ -178809,6 +178824,7 @@ GameObject:
   - component: {fileID: 1512908734}
   - component: {fileID: 1512908733}
   - component: {fileID: 1512908732}
+  - component: {fileID: 1512908739}
   m_Layer: 0
   m_Name: weapon test (2)
   m_TagString: Untagged
@@ -178938,7 +178954,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: c67b51d4693103544ba5a7f949f5b7b2,
     type: 2}
   programSource: {fileID: 11400000, guid: a3d2d26fd6f69b64eb84326e5148ae22, type: 2}
@@ -178997,7 +179013,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: ec283e0a28842474cba0532577276b66,
     type: 2}
   programSource: {fileID: 11400000, guid: 8bd606cb542f7804986ed6b227a90376, type: 2}
@@ -179068,6 +179084,20 @@ MonoBehaviour:
   _reloadAudio: {fileID: 0}
   _emptyAudio: {fileID: 0}
   _chargeAudio: {fileID: 0}
+--- !u!114 &1512908739
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1512908730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1783056023, guid: 661092b4961be7145bfbe56e1e62337b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  AllowCollisionOwnershipTransfer: 1
+  ForceKinematicOnRemote: 0
 --- !u!1 &1522948236
 GameObject:
   m_ObjectHideFlags: 0
@@ -179232,6 +179262,7 @@ GameObject:
   - component: {fileID: 1527154873}
   - component: {fileID: 1527154872}
   - component: {fileID: 1527154871}
+  - component: {fileID: 1527154878}
   m_Layer: 0
   m_Name: weapon test (1)
   m_TagString: Untagged
@@ -179361,7 +179392,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: c67b51d4693103544ba5a7f949f5b7b2,
     type: 2}
   programSource: {fileID: 11400000, guid: a3d2d26fd6f69b64eb84326e5148ae22, type: 2}
@@ -179420,7 +179451,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: ec283e0a28842474cba0532577276b66,
     type: 2}
   programSource: {fileID: 11400000, guid: 8bd606cb542f7804986ed6b227a90376, type: 2}
@@ -179491,6 +179522,20 @@ MonoBehaviour:
   _reloadAudio: {fileID: 0}
   _emptyAudio: {fileID: 0}
   _chargeAudio: {fileID: 0}
+--- !u!114 &1527154878
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1527154869}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1783056023, guid: 661092b4961be7145bfbe56e1e62337b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  AllowCollisionOwnershipTransfer: 1
+  ForceKinematicOnRemote: 0
 --- !u!1 &1529918868
 GameObject:
   m_ObjectHideFlags: 0
@@ -179642,7 +179687,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 16, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1607002996
@@ -185027,7 +185072,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 16, y: 0}
+  m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1662724130
@@ -195330,6 +195375,7 @@ GameObject:
   - component: {fileID: 1839218521}
   - component: {fileID: 1839218526}
   - component: {fileID: 1839218520}
+  - component: {fileID: 1839218527}
   m_Layer: 0
   m_Name: weapon test
   m_TagString: Untagged
@@ -195437,7 +195483,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: c67b51d4693103544ba5a7f949f5b7b2,
     type: 2}
   programSource: {fileID: 11400000, guid: a3d2d26fd6f69b64eb84326e5148ae22, type: 2}
@@ -195496,7 +195542,7 @@ MonoBehaviour:
   SynchronizePosition: 0
   AllowCollisionOwnershipTransfer: 0
   Reliable: 0
-  _syncMethod: 3
+  _syncMethod: 2
   serializedProgramAsset: {fileID: 11400000, guid: ec283e0a28842474cba0532577276b66,
     type: 2}
   programSource: {fileID: 11400000, guid: 8bd606cb542f7804986ed6b227a90376, type: 2}
@@ -195589,6 +195635,20 @@ MeshCollider:
   m_Convex: 1
   m_CookingOptions: -1
   m_Mesh: {fileID: 4861919281920674947, guid: 196d1c4dab7b799428c78c5b34f31c19, type: 3}
+--- !u!114 &1839218527
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1839218516}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1783056023, guid: 661092b4961be7145bfbe56e1e62337b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  AllowCollisionOwnershipTransfer: 1
+  ForceKinematicOnRemote: 0
 --- !u!1 &1851324226
 GameObject:
   m_ObjectHideFlags: 0
@@ -226522,18 +226582,18 @@ MonoBehaviour:
   useAssignedLayers: 0
   DynamicPrefabs: []
   DynamicMaterials:
-  - {fileID: 2100000, guid: 776cdc372a14acf44963071a2920c15d, type: 2}
-  - {fileID: 2100000, guid: 2c0b6ded123a2a6459941b0075af6e78, type: 2}
-  - {fileID: 2100000, guid: 5dd44c8c2749a2f4395444a3314f3215, type: 2}
   - {fileID: 2100000, guid: 527a15772b32dd34ebb2b1e062d5d1fa, type: 2}
-  - {fileID: 2100000, guid: c96a85b2be667b8419fbf9c1af6d773e, type: 2}
-  - {fileID: 2100000, guid: b137f6d2922818442bc312d076fdb2f3, type: 2}
   - {fileID: 2100000, guid: 7dd04dd1127765741bef7294b26fc525, type: 2}
   - {fileID: 2100000, guid: bab3d94264d63dd43b179861ddaa93d6, type: 2}
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 2c0b6ded123a2a6459941b0075af6e78, type: 2}
+  - {fileID: 2100000, guid: 5dd44c8c2749a2f4395444a3314f3215, type: 2}
+  - {fileID: 2100000, guid: 776cdc372a14acf44963071a2920c15d, type: 2}
+  - {fileID: 2100000, guid: c96a85b2be667b8419fbf9c1af6d773e, type: 2}
+  - {fileID: 2100000, guid: b137f6d2922818442bc312d076fdb2f3, type: 2}
   - {fileID: 1195563169}
   - {fileID: 1963198756}
   - {fileID: 2100000, guid: 5683c48d1a5488b45a25d9847306ab84, type: 2}
+  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
   LightMapsNear: []
   LightMapsFar: []
   LightMode: 0
@@ -226587,146 +226647,165 @@ MonoBehaviour:
   RenderReflectionIntensity: 0
   RenderSkybox: {fileID: 0}
   NetworkIDs:
-  - gameObject: {fileID: 3480278762663670689}
-    ID: 12
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 642708342}
-    ID: 13
+    ID: 10
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 991070501}
-    ID: 14
+    ID: 11
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1400420862}
-    ID: 15
+    ID: 12
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 247030522}
-    ID: 16
+    ID: 13
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 862311565}
-    ID: 17
+    ID: 14
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1522948236}
-    ID: 18
+    ID: 15
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 451473045}
-    ID: 19
+    ID: 16
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1173295578}
-    ID: 20
+    ID: 17
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1512467860}
-    ID: 21
+    ID: 18
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1366434719}
-    ID: 22
+    ID: 19
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1835423693}
-    ID: 23
+    ID: 20
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1151035835}
-    ID: 24
+    ID: 21
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 948337454}
-    ID: 25
+    ID: 22
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 300267967}
-    ID: 26
+    ID: 23
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 193219095}
-    ID: 27
+    ID: 24
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1862433905}
-    ID: 28
+    ID: 25
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1960555047}
-    ID: 29
+    ID: 26
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 309395793}
-    ID: 30
+    ID: 27
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 99365327}
-    ID: 31
+    ID: 28
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1016392415}
-    ID: 32
+    ID: 29
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1357301077}
-    ID: 33
+    ID: 30
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1621025417}
-    ID: 34
+    ID: 31
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1995044111}
-    ID: 35
+    ID: 32
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1376244525}
-    ID: 36
+    ID: 33
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 944837436}
-    ID: 37
+    ID: 34
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 837083299}
-    ID: 38
+    ID: 35
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1929041428}
-    ID: 39
+    ID: 36
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1365736288}
-    ID: 40
+    ID: 37
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 829884794}
-    ID: 41
+    ID: 38
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1874169101}
-    ID: 42
+    ID: 39
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 590348753}
-    ID: 43
+    ID: 40
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1221919920}
-    ID: 44
+    ID: 41
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1529918868}
-    ID: 45
+    ID: 42
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1663433719}
+    ID: 43
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+  - gameObject: {fileID: 38996064}
+    ID: 44
+    SerializedTypeNames:
+    - VRC.SDK3.Components.VRCPlayerObject
+  - gameObject: {fileID: 495131757}
+    ID: 45
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+  - gameObject: {fileID: 1427822508}
     ID: 46
     SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+  - gameObject: {fileID: 192026926}
+    ID: 47
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1740674370}
     ID: 48
@@ -226745,57 +226824,42 @@ MonoBehaviour:
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
   - gameObject: {fileID: 1839218516}
+    ID: 52
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
+    - VRC.SDK3.Components.VRCPickup
+    - VRC.SDK3.Components.VRCObjectSync
+  - gameObject: {fileID: 1527154869}
     ID: 53
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
     - VRC.Udon.UdonBehaviour
     - VRC.SDK3.Components.VRCPickup
-  - gameObject: {fileID: 474863005}
-    ID: 77
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-  - gameObject: {fileID: 38996064}
-    ID: 250
-    SerializedTypeNames:
-    - VRC.SDK3.Components.VRCPlayerObject
-  - gameObject: {fileID: 192026926}
-    ID: 52
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-  - gameObject: {fileID: 495131757}
-    ID: 102
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-  - gameObject: {fileID: 1427822508}
-    ID: 103
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-  - gameObject: {fileID: 1527154869}
-    ID: 251
-    SerializedTypeNames:
-    - VRC.Udon.UdonBehaviour
-    - VRC.Udon.UdonBehaviour
-    - VRC.SDK3.Components.VRCPickup
+    - VRC.SDK3.Components.VRCObjectSync
   - gameObject: {fileID: 1512908730}
-    ID: 252
+    ID: 54
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
     - VRC.Udon.UdonBehaviour
     - VRC.SDK3.Components.VRCPickup
+    - VRC.SDK3.Components.VRCObjectSync
   - gameObject: {fileID: 1279516776}
-    ID: 253
+    ID: 55
     SerializedTypeNames:
     - VRC.Udon.UdonBehaviour
     - VRC.Udon.UdonBehaviour
     - VRC.SDK3.Components.VRCPickup
+    - VRC.SDK3.Components.VRCObjectSync
+  - gameObject: {fileID: 474863005}
+    ID: 56
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+  - gameObject: {fileID: 3480278762663670689}
+    ID: 57
+    SerializedTypeNames:
+    - VRC.Udon.UdonBehaviour
+    - VRC.Udon.UdonBehaviour
   portraitCameraPositionOffset: {x: 0, y: 0, z: 0}
   portraitCameraRotationOffset: {x: 0, y: 1, z: 0, w: -0.00000004371139}
   PlayerPersistence:
