@@ -1,7 +1,8 @@
 using UdonSharp;
 using UnityEngine;
+using M2922.Core;
 
-namespace M2922.Core
+namespace M2922
 {
     public static class M2922_Debug
     {
@@ -39,7 +40,7 @@ namespace M2922.Core
         public static void Error(this M2922_Base context, string message)
         {
             if (context.DEBUG == false) return;
-            Error(message, context, context.GetType().Name);
+            Error(message, context, context.ScriptName);
         }
         public static void Error(string message, Object context = null, string tag = null)
         {
@@ -48,7 +49,7 @@ namespace M2922.Core
         public static void Warning(this M2922_Base context, string message)
         {
             if (context.DEBUG == false) return;
-            Warning(message, context, context.GetType().Name);
+            Warning(message, context, context.ScriptName);
         }
         public static void Warning(string message, Object context = null, string tag = null)
         {
@@ -57,7 +58,7 @@ namespace M2922.Core
         public static void Log(this M2922_Base context, string message)
         {
             if (context.DEBUG == false) return;
-            Log(message, context, context.GetType().Name);
+            Log(message, context, context.ScriptName);
         }
         public static void Log(string message, Object context = null, string tag = null)
         {
@@ -66,7 +67,7 @@ namespace M2922.Core
         public static void Debug(this M2922_Base context, string message)
         {
             if (context.DEBUG == false) return;
-            Debug(message, context, context.GetType().Name);
+            Debug(message, context, context.ScriptName);
         }
         public static void Debug(string message, Object context = null, string tag = null)
         {
@@ -76,7 +77,7 @@ namespace M2922.Core
         public static void Editor(this M2922_Base context, string message)
         {
             if (context.DEBUG == false) return;
-            Editor(message, context, context.GetType().Name);
+            Editor(message, context, context.ScriptName);
         }
         public static void Editor(string message, Object context = null, string tag = null)
         {
@@ -87,7 +88,7 @@ namespace M2922.Core
         public static void VerboseError(this M2922_Base context, string message)
         {
             if (context.VERBOSE_DEBUG == false || context.DEBUG == false) return;
-            Error(message, context, context.GetType().Name);
+            Error(message, context, context.ScriptName);
         }
         public static void VerboseError(string message, Object context = null, string tag = null)
         {
@@ -96,7 +97,7 @@ namespace M2922.Core
         public static void VerboseWarning(this M2922_Base context, string message)
         {
             if (context.VERBOSE_DEBUG == false || context.DEBUG == false) return;
-            Warning(message, context, context.GetType().Name);
+            Warning(message, context, context.ScriptName);
         }
         public static void VerboseWarning(string message, Object context = null, string tag = null)
         {
@@ -105,7 +106,7 @@ namespace M2922.Core
         public static void VerboseLog(this M2922_Base context, string message)
         {
             if (context.VERBOSE_DEBUG == false || context.DEBUG == false) return;
-            Log(message, context, context.GetType().Name);
+            Log(message, context, context.ScriptName);
         }
         public static void VerboseLog(string message, Object context = null, string tag = null)
         {
@@ -114,7 +115,7 @@ namespace M2922.Core
         public static void VerboseDebug(this M2922_Base context, string message)
         {
             if (context.VERBOSE_DEBUG == false || context.DEBUG == false) return;
-            Debug(message, context, context.GetType().Name);
+            Debug(message, context, context.ScriptName);
         }
         public static void VerboseDebug(string message, Object context = null, string tag = null)
         {
@@ -124,7 +125,7 @@ namespace M2922.Core
         public static void VerboseEditor(this M2922_Base context, string message)
         {
             if (context.VERBOSE_DEBUG == false || context.DEBUG == false) return;
-            Editor(message, context, context.GetType().Name);
+            Editor(message, context, context.ScriptName);
         }
         public static void VerboseEditor(string message, Object context = null, string tag = null)
         {
@@ -132,8 +133,23 @@ namespace M2922.Core
         }
 #endif
         // message formatting
+        private static string TypeLabel(LogType type)
+        {
+            switch (type)
+            {
+                case LogType.Error:   return "ERROR";
+                case LogType.Warning: return "WARN";
+                case LogType.Log:     return "LOG";
+                case LogType.Debug:   return "DEBUG";
+#if UNITY_EDITOR
+                case LogType.Editor:  return "EDITOR";
+#endif
+                default:              return "???";
+            }
+        }
+
         private static string FormatMessage(LogType type, string message, string tag) {
-            return $"[<color=#{ColorFromTag(tag).ToString("X2")}>{tag}</color>] <color=#{ColorFromType(type).ToString("X2")}>{type.ToString().ToUpper()} {message}</color>";
+            return $"[<color=#{ColorFromTag(tag).ToString("X6")}>{tag}</color>] <color=#{ColorFromType(type).ToString("X6")}>{TypeLabel(type)} {message}</color>";
         }
     }
 	public enum LogType {

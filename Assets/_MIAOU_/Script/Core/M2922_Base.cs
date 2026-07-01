@@ -13,7 +13,6 @@ using System.Buffers;
 
 namespace M2922.Core
 {
-    // Classe de base pour tous les composants M2922
     public class M2922_Base : UdonSharpBehaviour
     {
         [Header("=== GLOBAL DEBUG ===")]
@@ -23,48 +22,138 @@ namespace M2922.Core
         [Header("=== MANAGER REFERENCE ===")]
         public M2922_Manager Manager;
 
-        [Header("=== VISUAL DEBUG ===")]
-        [Tooltip("Afficher les infos de l'entité dans l'éditeur")]
-        [SerializeField] protected bool _showGizmo = true;
-        
-        [Tooltip("Couleur du gizmo")]
-        [SerializeField] protected Color _gizmoColor = Color.green;
-        
-        [Tooltip("Taille du gizmo")]
-        [SerializeField] protected float _gizmoSize = 0.5f;
-        
+        [Header("=== SCRIPT IDENTITY ===")]
+        [SerializeField] private string _ScriptName = "";
+        public string ScriptName => string.IsNullOrEmpty(_ScriptName) ? this.GetType().Name : _ScriptName;
+
+        [Header("=== GIZMO ===")]
+        [SerializeField] private bool _showGizmo = true;
+
+        [Header("=== AUTO GIZMO ===")]
+        [SerializeField] private bool _autoGizmo = true;
+        [SerializeField] private float _gizmoOffsetY = 0.3f;
+        [SerializeField] private float _gizmoHeaderScale = 12f;
+        [SerializeField] private float _gizmoValueScale = 10f;
+        [SerializeField] private Color _gizmoHeaderColor = new Color(0f, 1f, 0.8f);
+        [SerializeField] private bool _gizmoOnlyWhenSelected = false;
+
+        /// <summary>
+        /// Surchargez pour auto-détecter les références (GetComponent) sur ce GameObject.
+        /// Appelé depuis OnValidate() (éditeur) et Start() (runtime).
+        /// </summary>
+        protected virtual void AutoDetectReferences() { }
+
         //methodes
         // recherche le manager dans la scene
         private void TryFindManager()
         {
-            GameObject _Obj = GameObject.Find("Manager");
-            if (_Obj != null) Manager = _Obj.GetComponent<M2922_Manager>();
+            GameObject _ManagerObj = GameObject.Find("Manager");
+            if (_ManagerObj == null) return;
+            Manager = _ManagerObj.GetComponent<M2922_Manager>();
+            if (Manager == null) return;
         }
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
 
         // validation dans l'editeur
         protected virtual void OnValidate()
         {
+            if (string.IsNullOrEmpty(_ScriptName))
+                _ScriptName = this.GetType().Name;
             if (Manager == null) TryFindManager();
             SetDebugFlags();
-        }
-        
-        // gizmos
-        protected virtual void OnDrawGizmos() {
-            if (!_showGizmo) return;
-        }
-        protected virtual void OnDrawGizmosSelected() {
-            if (!_showGizmo) return;
+            AutoDetectReferences();
         }
 
+        protected virtual void OnDrawGizmos()
+        {
+            if (!_showGizmo) return;
+            if (!_gizmoOnlyWhenSelected)
+                DrawAutoGizmo();
+        }
 
+        protected virtual void OnDrawGizmosSelected()
+        {
+            if (!_showGizmo) return;
+            if (_gizmoOnlyWhenSelected)
+                DrawAutoGizmo();
+        }
+
+        /// <summary>
+        /// Surchargez cette méthode pour afficher les valeurs importantes du composant dans le gizmo.
+        /// Retourne un tableau de paires label/valeur.
+        /// </summary>
+        protected virtual M2922_GizmoDisplayInfo[] GetGizmoValues() { return null; }
+
+        private void DrawAutoGizmo()
+        {
+            if (!_autoGizmo) return;
+
+            // Récupérer tous les M2922_Base sur ce GameObject
+            var allScripts = GetComponents<M2922_Base>();
+            if (allScripts == null || allScripts.Length == 0) return;
+
+            int total = allScripts.Length;
+            int index = -1;
+            for (int i = 0; i < total; i++)
+            {
+                if (allScripts[i] == this) { index = i; break; }
+            }
+            if (index < 0) return;
+
+            // Offset vertical : on empile du haut vers le bas
+            float yBase = transform.position.y + (total - 1) * _gizmoOffsetY * 0.5f;
+            float yPos = yBase - index * _gizmoOffsetY;
+
+            Vector3 labelPos = new Vector3(transform.position.x, yPos, transform.position.z);
+
+            // Style header (nom du script)
+            GUIStyle headerStyle = new GUIStyle();
+            headerStyle.normal.textColor = _gizmoHeaderColor;
+            headerStyle.fontSize = Mathf.RoundToInt(_gizmoHeaderScale);
+            headerStyle.fontStyle = FontStyle.Bold;
+
+            UnityEditor.Handles.Label(labelPos, ScriptName, headerStyle);
+
+            // Valeurs importantes
+            M2922_GizmoDisplayInfo[] values = GetGizmoValues();
+            if (values != null && values.Length > 0)
+            {
+                GUIStyle valueStyle = new GUIStyle();
+                valueStyle.fontSize = Mathf.RoundToInt(_gizmoValueScale);
+                valueStyle.normal.textColor = Color.white;
+
+                float valueOffsetY = _gizmoOffsetY * 0.35f;
+
+                for (int i = 0; i < values.Length; i++)
+                {
+                    if (string.IsNullOrEmpty(values[i].Label)) continue;
+
+                    Vector3 valPos = labelPos + Vector3.down * ((i + 1) * valueOffsetY);
+
+                    valueStyle.normal.textColor = values[i].Color != default(Color)
+                        ? values[i].Color
+                        : Color.white;
+
+                    string line = string.IsNullOrEmpty(values[i].Value)
+                        ? values[i].Label
+                        : $"{values[i].Label}: {values[i].Value}";
+
+                    UnityEditor.Handles.Label(valPos, line, valueStyle);
+                }
+            }
+
+            // Point de repère
+            Gizmos.color = _gizmoHeaderColor;
+            Gizmos.DrawSphere(transform.position, 0.05f);
+        }
 #endif
-        protected virtual void Awake() { }
-
         protected virtual void Start()
         {
+            if (string.IsNullOrEmpty(_ScriptName))
+            _ScriptName = this.GetType().Name;
             if (Manager == null) TryFindManager();
             SetDebugFlags();
+            AutoDetectReferences();
         }
         protected virtual void Update()
         {
@@ -74,11 +163,9 @@ namespace M2922.Core
                 SetDebugFlags();
             }
         }
-
         private void SetDebugFlags()
         {
-            // Ne pas copier les flags si on est le Manager lui-même
-            if (Manager == null || Manager.gameObject == gameObject) return;
+            if (Manager == null || Manager == this.gameObject) return;
             DEBUG = Manager.DEBUG;
             VERBOSE_DEBUG = Manager.VERBOSE_DEBUG;
         }

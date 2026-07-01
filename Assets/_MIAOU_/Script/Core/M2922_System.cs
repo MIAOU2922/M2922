@@ -1,34 +1,19 @@
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
-using M2922.Core;
 
 namespace M2922.Core
 {
-    /// Classe de base pour tout système du jeu (armure, santé, etc).
+    /// <summary>
+    /// Central system orchestrator — entry point that initializes all core subsystems.
+    /// </summary>
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_System : M2922_Base
     {
-         // === METHODE ===
         protected override void Start()
         {
             base.Start();
+            this.Log("M2922 System initialized.");
         }
-
-#if !COMPILER_UDONSHARP && UNITY_EDITOR
-        protected override void OnValidate()
-        {
-            base.OnValidate();
-        }
-        protected override void OnDrawGizmos()
-        {
-            base.OnDrawGizmos();
-            if (!_showGizmo) return;
-        }
-        protected override void OnDrawGizmosSelected()
-        {
-            base.OnDrawGizmosSelected();
-            if (!_showGizmo) return;
-        }
-#endif
     }
 }
