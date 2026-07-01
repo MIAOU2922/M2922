@@ -8,6 +8,7 @@ namespace M2922.Component.Weapon
     /// <summary>
     /// Gestion de la dispersion du tir (spread / précision).
     /// </summary>
+    [AddComponentMenu("M2922/Weapon/Spread Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_SpreadComponent : M2922_Base
     {

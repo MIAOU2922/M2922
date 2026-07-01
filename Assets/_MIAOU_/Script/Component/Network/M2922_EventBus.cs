@@ -11,6 +11,7 @@ namespace M2922.Component.Network
     /// Bus d'événements central : OnHit, OnKill, OnDeath, etc.
     /// Permet à tous les composants de s'abonner sans référence directe.
     /// </summary>
+    [AddComponentMenu("M2922/Network/Event Bus")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_EventBus : M2922_Base
     {

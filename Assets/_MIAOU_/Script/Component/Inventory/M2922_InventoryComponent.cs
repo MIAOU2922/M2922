@@ -8,6 +8,7 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Inventaire : slots, stockage, poids.
     /// </summary>
+    [AddComponentMenu("M2922/Inventory/Inventory Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_InventoryComponent : M2922_Base
     {

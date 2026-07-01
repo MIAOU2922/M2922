@@ -8,6 +8,7 @@ namespace M2922.Component.World
     /// <summary>
     /// Échelle / escalade : zones start/end, vitesse.
     /// </summary>
+    [AddComponentMenu("M2922/World/Ladder Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_LadderComponent : M2922_Base
     {

@@ -8,6 +8,7 @@ namespace M2922.Component.Weapon
     /// <summary>
     /// Gère le déclenchement du tir (input) et la cadence de tir.
     /// </summary>
+    [AddComponentMenu("M2922/Weapon/Fire Controller")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_FireController : M2922_Base
     {

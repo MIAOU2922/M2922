@@ -8,6 +8,7 @@ namespace M2922.Component.Projectile
     /// <summary>
     /// Effets visuels liés aux projectiles : trails, impacts, beams.
     /// </summary>
+    [AddComponentMenu("M2922/Projectile/VFX Projectile")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_VFXProjectile : M2922_Base
     {

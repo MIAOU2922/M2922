@@ -10,6 +10,7 @@ namespace M2922.Component.Health
     /// Pipeline de réception des dégâts : invincibility → shield → armor → health.
     /// Intègre le ModifierContainer pour les buffs/debuffs (invincibilité, armor+, etc.).
     /// </summary>
+    [AddComponentMenu("M2922/Health/Damage Receiver")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_DamageReceiver : M2922_Base
     {

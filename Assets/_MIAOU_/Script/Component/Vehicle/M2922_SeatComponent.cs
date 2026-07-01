@@ -8,6 +8,7 @@ namespace M2922.Component.Vehicle
     /// <summary>
     /// Place dans un véhicule : occupation joueur, contrôle input.
     /// </summary>
+    [AddComponentMenu("M2922/Vehicle/Seat Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_SeatComponent : M2922_Base
     {

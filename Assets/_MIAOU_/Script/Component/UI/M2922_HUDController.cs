@@ -11,6 +11,7 @@ namespace M2922.Component.UI
     /// <summary>
     /// Contrôleur HUD : vie, munitions, hitmarker, etc.
     /// </summary>
+    [AddComponentMenu("M2922/UI/HUD Controller")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_HUDController : M2922_Base
     {

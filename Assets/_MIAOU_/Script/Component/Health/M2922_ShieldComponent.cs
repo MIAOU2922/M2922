@@ -8,6 +8,7 @@ namespace M2922.Component.Health
     /// <summary>
     /// Bouclier absorbant les dégâts avant les HP, avec sa propre régénération.
     /// </summary>
+    [AddComponentMenu("M2922/Health/Shield Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ShieldComponent : M2922_Base
     {

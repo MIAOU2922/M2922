@@ -11,6 +11,7 @@ namespace M2922.Component.Weapon
     /// <summary>
     /// Logique d'arme : fire mode, damage, portée.
     /// </summary>
+    [AddComponentMenu("M2922/Weapon/Weapon Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_WeaponComponent : M2922_Base
     {

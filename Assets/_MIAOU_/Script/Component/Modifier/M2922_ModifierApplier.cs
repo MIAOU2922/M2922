@@ -8,6 +8,7 @@ namespace M2922.Component.Modifier
     /// <summary>
     /// Applique des modificateurs à soi-même ou à d'autres entités.
     /// </summary>
+    [AddComponentMenu("M2922/Modifier/Modifier Applier")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ModifierApplier : M2922_Base
     {

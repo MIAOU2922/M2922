@@ -11,6 +11,7 @@ namespace M2922.Component.Vehicle
     /// <summary>
     /// Contrôle global du véhicule : état, entrée/sortie.
     /// </summary>
+    [AddComponentMenu("M2922/Vehicle/Vehicle Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_VehicleComponent : M2922_Base
     {

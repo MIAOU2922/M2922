@@ -8,6 +8,7 @@ namespace M2922.Component.Weapon
     /// <summary>
     /// Gestion du recul : kickback visuel + mécanique.
     /// </summary>
+    [AddComponentMenu("M2922/Weapon/Recoil Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_RecoilComponent : M2922_Base
     {

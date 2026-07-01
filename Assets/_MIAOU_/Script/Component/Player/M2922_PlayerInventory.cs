@@ -9,6 +9,7 @@ namespace M2922.Component.Player
     /// <summary>
     /// Inventaire spécifique au joueur.
     /// </summary>
+    [AddComponentMenu("M2922/Player/Player Inventory")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PlayerInventory : M2922_Base
     {

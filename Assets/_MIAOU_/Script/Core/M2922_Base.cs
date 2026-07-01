@@ -23,6 +23,7 @@ namespace M2922.Core
         public M2922_Manager Manager;
 
         [Header("=== SCRIPT IDENTITY ===")]
+        [SerializeField] private bool _autoName = true;
         [SerializeField] private string _ScriptName = "";
         public string ScriptName => string.IsNullOrEmpty(_ScriptName) ? this.GetType().Name : _ScriptName;
 
@@ -57,7 +58,9 @@ namespace M2922.Core
         // validation dans l'editeur
         protected virtual void OnValidate()
         {
-            if (string.IsNullOrEmpty(_ScriptName))
+            if (_autoName)
+                _ScriptName = this.GetType().Name;
+            else if (string.IsNullOrEmpty(_ScriptName))
                 _ScriptName = this.GetType().Name;
             if (Manager == null) TryFindManager();
             SetDebugFlags();
@@ -149,7 +152,9 @@ namespace M2922.Core
 #endif
         protected virtual void Start()
         {
-            if (string.IsNullOrEmpty(_ScriptName))
+            if (_autoName)
+            _ScriptName = this.GetType().Name;
+            else if (string.IsNullOrEmpty(_ScriptName))
             _ScriptName = this.GetType().Name;
             if (Manager == null) TryFindManager();
             SetDebugFlags();

@@ -8,6 +8,7 @@ namespace M2922.Component.Physics
     /// <summary>
     /// Gestion de gravité personnalisée ou override de la gravité Unity.
     /// </summary>
+    [AddComponentMenu("M2922/Physics/Gravity Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_GravityComponent : M2922_Base
     {

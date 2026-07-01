@@ -8,6 +8,7 @@ namespace M2922.Component.Ammo
     /// <summary>
     /// Définit un type de munition compatible avec certaines armes/magazines.
     /// </summary>
+    [AddComponentMenu("M2922/Ammo/Ammo Type Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_AmmoTypeComponent : M2922_Base
     {

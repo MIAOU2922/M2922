@@ -8,6 +8,7 @@ namespace M2922.Component.World
     /// <summary>
     /// Zone de trigger générique : entrée, sortie, stay.
     /// </summary>
+    [AddComponentMenu("M2922/World/Trigger Zone")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_TriggerZone : M2922_Base
     {

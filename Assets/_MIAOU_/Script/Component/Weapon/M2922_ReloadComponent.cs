@@ -11,6 +11,7 @@ namespace M2922.Component.Weapon
     /// <summary>
     /// Gestion du rechargement : automatique, manuel, heat-based.
     /// </summary>
+    [AddComponentMenu("M2922/Weapon/Reload Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ReloadComponent : M2922_Base
     {

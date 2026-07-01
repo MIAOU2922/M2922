@@ -8,6 +8,7 @@ namespace M2922.Component.Health
     /// <summary>
     /// Gère les points de vie : HP, max HP, régénération, mort.
     /// </summary>
+    [AddComponentMenu("M2922/Health/Health Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_HealthComponent : M2922_Base
     {

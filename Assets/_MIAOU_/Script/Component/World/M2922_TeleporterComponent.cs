@@ -8,6 +8,7 @@ namespace M2922.Component.World
     /// <summary>
     /// Téléporteur : point A → point B.
     /// </summary>
+    [AddComponentMenu("M2922/World/Teleporter Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_TeleporterComponent : M2922_Base
     {

@@ -9,6 +9,7 @@ namespace M2922.Component.Game
     /// <summary>
     /// Points de spawn et système de respawn.
     /// </summary>
+    [AddComponentMenu("M2922/Game/Spawn Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_SpawnManager : M2922_Base
     {

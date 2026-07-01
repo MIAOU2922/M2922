@@ -8,6 +8,7 @@ namespace M2922.Component.Projectile
     /// <summary>
     /// Logique projectile/balle : vitesse, durée de vie, mouvement.
     /// </summary>
+    [AddComponentMenu("M2922/Projectile/Projectile Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ProjectileComponent : M2922_Base
     {

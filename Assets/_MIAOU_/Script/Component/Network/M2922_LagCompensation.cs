@@ -8,6 +8,7 @@ namespace M2922.Component.Network
     /// <summary>
     /// Compensation de lag simplifiée pour les hits.
     /// </summary>
+    [AddComponentMenu("M2922/Network/Lag Compensation")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_LagCompensation : M2922_Base
     {

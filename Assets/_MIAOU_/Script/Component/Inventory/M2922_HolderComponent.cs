@@ -10,6 +10,7 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Slots spécifiques : armes, magazines, outils. Accès rapide.
     /// </summary>
+    [AddComponentMenu("M2922/Inventory/Holder Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_HolderComponent : M2922_Base
     {

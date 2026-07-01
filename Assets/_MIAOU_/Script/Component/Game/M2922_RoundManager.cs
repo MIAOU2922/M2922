@@ -10,6 +10,7 @@ namespace M2922.Component.Game
     /// <summary>
     /// Gestion des manches : début, fin, timers, phases.
     /// </summary>
+    [AddComponentMenu("M2922/Game/Round Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_RoundManager : M2922_Base
     {

@@ -9,6 +9,7 @@ namespace M2922.Component.UI
     /// <summary>
     /// Interface utilisateur de l'inventaire.
     /// </summary>
+    [AddComponentMenu("M2922/UI/Inventory UI")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_InventoryUI : M2922_Base
     {

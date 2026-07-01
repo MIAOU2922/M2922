@@ -9,6 +9,7 @@ namespace M2922.Component.Modifier
     /// Conteneur de buffs/debuffs temporaires.
     /// Stockage optimisé en arrays parallèles : (ModifierType, value, durée, timeAdded).
     /// </summary>
+    [AddComponentMenu("M2922/Modifier/Modifier Container")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ModifierContainer : M2922_Base
     {

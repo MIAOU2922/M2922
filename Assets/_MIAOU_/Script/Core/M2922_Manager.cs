@@ -8,6 +8,7 @@ using VRC.Udon.Common.Interfaces;
 namespace M2922.Core
 {
 
+    [AddComponentMenu("M2922/Core/Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_Manager : M2922_Base
     {

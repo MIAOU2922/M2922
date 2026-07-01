@@ -11,6 +11,7 @@ namespace M2922.Component.Projectile
     /// <summary>
     /// Détection de collision d'un projectile : raycast ou trigger.
     /// </summary>
+    [AddComponentMenu("M2922/Projectile/Hit Detector")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_HitDetector : M2922_Base
     {

@@ -8,6 +8,7 @@ namespace M2922.Component.Utils
     /// <summary>
     /// Debug visuel : logs, gizmos runtime, visualisations.
     /// </summary>
+    [AddComponentMenu("M2922/Utils/Debug Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_DebugComponent : M2922_Base
     {

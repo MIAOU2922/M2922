@@ -8,6 +8,7 @@ namespace M2922.Component.Vehicle
     /// <summary>
     /// Support pour armes montées sur véhicule (tourelles, mitrailleuses).
     /// </summary>
+    [AddComponentMenu("M2922/Vehicle/Vehicle Weapon Mount")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_VehicleWeaponMount : M2922_Base
     {

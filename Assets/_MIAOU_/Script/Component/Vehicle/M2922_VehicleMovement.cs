@@ -8,6 +8,7 @@ namespace M2922.Component.Vehicle
     /// <summary>
     /// Physique de véhicule : voiture, avion, bateau.
     /// </summary>
+    [AddComponentMenu("M2922/Vehicle/Vehicle Movement")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_VehicleMovement : M2922_Base
     {

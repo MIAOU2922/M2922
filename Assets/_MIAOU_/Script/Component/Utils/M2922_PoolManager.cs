@@ -9,6 +9,7 @@ namespace M2922.Component.Utils
     /// <summary>
     /// Gestionnaire d'object pooling : spawn/despawn optimisé.
     /// </summary>
+    [AddComponentMenu("M2922/Utils/Pool Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PoolManager : M2922_Base
     {

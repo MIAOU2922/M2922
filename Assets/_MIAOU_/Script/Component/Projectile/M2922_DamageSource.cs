@@ -10,6 +10,7 @@ namespace M2922.Component.Projectile
     /// <summary>
     /// Source de dégâts : qui, quel type, combien.
     /// </summary>
+    [AddComponentMenu("M2922/Projectile/Damage Source")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_DamageSource : M2922_Base
     {

@@ -8,6 +8,7 @@ namespace M2922.Component.Network
     /// <summary>
     /// Gestion de l'ownership Udon : critique pour la synchro réseau.
     /// </summary>
+    [AddComponentMenu("M2922/Network/Ownership Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_OwnershipManager : M2922_Base
     {

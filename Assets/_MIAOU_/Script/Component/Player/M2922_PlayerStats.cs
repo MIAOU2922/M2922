@@ -10,6 +10,7 @@ namespace M2922.Component.Player
     /// <summary>
     /// Stats joueur : HP, armor, speed, team.
     /// </summary>
+    [AddComponentMenu("M2922/Player/Player Stats")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PlayerStats : M2922_Base
     {

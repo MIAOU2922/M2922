@@ -8,6 +8,7 @@ namespace M2922.Component.Health
     /// <summary>
     /// Gère la mort : respawn, despawn, events OnDeath/OnRevive.
     /// </summary>
+    [AddComponentMenu("M2922/Health/Death Handler")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_DeathHandler : M2922_Base
     {

@@ -9,6 +9,7 @@ namespace M2922.Component.Player
     /// <summary>
     /// Bridge entre VRCPlayerApi et le système de gameplay.
     /// </summary>
+    [AddComponentMenu("M2922/Player/Player Controller")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PlayerController : M2922_Base
     {

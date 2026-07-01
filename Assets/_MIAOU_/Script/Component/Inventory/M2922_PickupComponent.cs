@@ -8,6 +8,7 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Interaction de ramassage / drop d'objet.
     /// </summary>
+    [AddComponentMenu("M2922/Inventory/Pickup Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PickupComponent : M2922_Base
     {

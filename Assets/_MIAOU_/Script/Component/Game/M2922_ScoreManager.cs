@@ -10,6 +10,7 @@ namespace M2922.Component.Game
     /// Gestion du score : kills, deaths, points, assists.
     /// Stocke les scores par playerId (Udon-compatible, pas de gameObject).
     /// </summary>
+    [AddComponentMenu("M2922/Game/Score Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ScoreManager : M2922_Base
     {

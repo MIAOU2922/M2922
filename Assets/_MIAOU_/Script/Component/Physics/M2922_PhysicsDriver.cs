@@ -8,6 +8,7 @@ namespace M2922.Component.Physics
     /// <summary>
     /// Interaction avec le Rigidbody : forces, impulses, vélocité.
     /// </summary>
+    [AddComponentMenu("M2922/Physics/Physics Driver")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PhysicsDriver : M2922_Base
     {

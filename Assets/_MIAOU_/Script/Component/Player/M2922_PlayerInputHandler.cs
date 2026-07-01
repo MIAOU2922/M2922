@@ -10,6 +10,7 @@ namespace M2922.Component.Player
     /// <summary>
     /// Gestion des inputs joueur : tir, interaction, rechargement.
     /// </summary>
+    [AddComponentMenu("M2922/Player/Player Input Handler")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_PlayerInputHandler : M2922_Base
     {

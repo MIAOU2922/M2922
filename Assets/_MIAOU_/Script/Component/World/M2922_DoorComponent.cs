@@ -10,6 +10,7 @@ namespace M2922.Component.World
     /// <summary>
     /// Porte : open/close, trigger, lock, synced.
     /// </summary>
+    [AddComponentMenu("M2922/World/Door Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_DoorComponent : M2922_Base
     {

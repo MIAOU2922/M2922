@@ -10,6 +10,7 @@ namespace M2922.Component.Game
     /// <summary>
     /// Règles de partie : TDM, FFA, CTF, etc.
     /// </summary>
+    [AddComponentMenu("M2922/Game/Game Mode Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_GameModeManager : M2922_Base
     {

@@ -8,6 +8,7 @@ namespace M2922.Component.Physics
     /// <summary>
     /// Déplacement de base : walk, swim, sprint.
     /// </summary>
+    [AddComponentMenu("M2922/Physics/Movement Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_MovementComponent : M2922_Base
     {

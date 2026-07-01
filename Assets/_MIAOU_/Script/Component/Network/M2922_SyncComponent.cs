@@ -8,6 +8,7 @@ namespace M2922.Component.Network
     /// <summary>
     /// Synchronisation des variables importantes entre joueurs.
     /// </summary>
+    [AddComponentMenu("M2922/Network/Sync Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_SyncComponent : M2922_Base
     {

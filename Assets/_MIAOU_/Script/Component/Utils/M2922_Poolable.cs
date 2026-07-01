@@ -8,6 +8,7 @@ namespace M2922.Component.Utils
     /// <summary>
     /// Objet compatible avec l'object pooling.
     /// </summary>
+    [AddComponentMenu("M2922/Utils/Poolable")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_Poolable : M2922_Base
     {

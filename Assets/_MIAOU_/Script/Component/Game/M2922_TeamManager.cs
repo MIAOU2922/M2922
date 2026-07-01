@@ -9,6 +9,7 @@ namespace M2922.Component.Game
     /// <summary>
     /// Gestion des équipes et assignation des joueurs.
     /// </summary>
+    [AddComponentMenu("M2922/Game/Team Manager")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_TeamManager : M2922_Base
     {

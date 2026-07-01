@@ -22,6 +22,7 @@ namespace M2922.Component.Health
     ///   if (hitboxSys != null && hitboxSys.IsMyCollider(col))
     ///       receiver.ApplyDamage(damage, owner, isCrit);
     /// </summary>
+    [AddComponentMenu("M2922/Health/Hitbox System")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_HitboxSystem : M2922_Base
     {

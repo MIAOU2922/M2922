@@ -10,6 +10,7 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Objet générique : pickupable, usable, poids, nom.
     /// </summary>
+    [AddComponentMenu("M2922/Inventory/Item Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ItemComponent : M2922_Base
     {

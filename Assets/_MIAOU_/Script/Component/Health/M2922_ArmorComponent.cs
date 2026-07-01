@@ -8,6 +8,7 @@ namespace M2922.Component.Health
     /// <summary>
     /// Réduction de dégâts : valeur fixe (flat) et/ou pourcentage.
     /// </summary>
+    [AddComponentMenu("M2922/Health/Armor Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ArmorComponent : M2922_Base
     {

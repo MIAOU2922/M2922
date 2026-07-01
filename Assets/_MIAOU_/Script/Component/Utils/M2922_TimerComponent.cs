@@ -8,6 +8,7 @@ namespace M2922.Component.Utils
     /// <summary>
     /// Cooldowns génériques : utilisable pour tirs, sorts, dash, etc.
     /// </summary>
+    [AddComponentMenu("M2922/Utils/Timer Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_TimerComponent : M2922_Base
     {

@@ -9,6 +9,7 @@ namespace M2922.Component.UI
     /// <summary>
     /// Affichage du tableau des scores.
     /// </summary>
+    [AddComponentMenu("M2922/UI/Scoreboard UI")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_ScoreboardUI : M2922_Base
     {

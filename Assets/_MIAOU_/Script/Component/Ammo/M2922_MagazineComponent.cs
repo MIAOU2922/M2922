@@ -8,6 +8,7 @@ namespace M2922.Component.Ammo
     /// <summary>
     /// Chargeur : capacité, munitions actuelles, type.
     /// </summary>
+    [AddComponentMenu("M2922/Ammo/Magazine Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_MagazineComponent : M2922_Base
     {
