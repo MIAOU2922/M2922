@@ -38,7 +38,7 @@ namespace M2922.Component.Player
             _isInEditor = _localPlayer == null;
         }
 
-        private void Update()
+        protected override void Update()
         {
             if (_isInEditor) return;
             if (_localPlayer == null) return;
