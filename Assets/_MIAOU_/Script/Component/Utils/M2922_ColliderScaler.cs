@@ -29,8 +29,14 @@ namespace M2922.Component.Utils
         [Tooltip("Transform du point A.")]
         public Transform pointA;
 
+        [Tooltip("Offset local appliqué au point A (relatif à la rotation de pointA).")]
+        public Vector3 offsetA = Vector3.zero;
+
         [Tooltip("Transform du point B.")]
         public Transform pointB;
+
+        [Tooltip("Offset local appliqué au point B (relatif à la rotation de pointB).")]
+        public Vector3 offsetB = Vector3.zero;
 
         [Header("=== COLLIDER ===")]
         [Tooltip("Type de collider à utiliser. Doit correspondre au collider présent sur ce GameObject.")]
@@ -80,8 +86,8 @@ namespace M2922.Component.Utils
         {
             if (pointA == null || pointB == null) return;
 
-            Vector3 posA = pointA.position;
-            Vector3 posB = pointB.position;
+            Vector3 posA = pointA.position + pointA.TransformDirection(offsetA);
+            Vector3 posB = pointB.position + pointB.TransformDirection(offsetB);
 
             // Vérifier si on a besoin de recalculer
             if (posA == _lastPosA && posB == _lastPosB && Mathf.Approximately(thickness, _lastThickness))
@@ -220,11 +226,18 @@ namespace M2922.Component.Utils
 
             if (pointA == null || pointB == null) return;
 
-            Vector3 posA = pointA.position;
-            Vector3 posB = pointB.position;
+            Vector3 rawPosA = pointA.position;
+            Vector3 rawPosB = pointB.position;
+            Vector3 posA = rawPosA + pointA.TransformDirection(offsetA);
+            Vector3 posB = rawPosB + pointB.TransformDirection(offsetB);
             Vector3 mid = (posA + posB) * 0.5f;
 
-            // Ligne entre A et B
+            // Ligne pointillée entre les transforms bruts et les points offsettés
+            Gizmos.color = Color.gray;
+            if (offsetA != Vector3.zero) Gizmos.DrawLine(rawPosA, posA);
+            if (offsetB != Vector3.zero) Gizmos.DrawLine(rawPosB, posB);
+
+            // Ligne entre A et B (points offsettés)
             Gizmos.color = Color.cyan;
             Gizmos.DrawLine(posA, posB);
 

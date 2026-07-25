@@ -38,7 +38,7 @@ namespace M2922.Component.Player
             _isInEditor = _localPlayer == null;
         }
 
-        protected override void Update()
+        public override void PostLateUpdate()
         {
             if (_isInEditor) return;
             if (_localPlayer == null) return;
@@ -58,12 +58,7 @@ namespace M2922.Component.Player
             if (trackRotation && rotationOffset != Vector3.zero)
                 targetRot *= Quaternion.Euler(rotationOffset);
 
-            if (trackPosition && trackRotation)
-                transform.SetPositionAndRotation(targetPos, targetRot);
-            else if (trackPosition)
-                transform.position = targetPos;
-            else if (trackRotation)
-                transform.rotation = targetRot;
+            transform.SetPositionAndRotation(targetPos, targetRot);
         }
     }
 }
