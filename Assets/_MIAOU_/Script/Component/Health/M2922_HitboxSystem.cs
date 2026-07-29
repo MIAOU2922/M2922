@@ -29,6 +29,10 @@ namespace M2922.Component.Health
         [Header("=== HITBOX CONFIG ===")]
         [Tooltip("Colliders du corps de cette entité. Chaque collider doit être un enfant de ce GameObject.")]
         [SerializeField] private Collider[] _hitboxColliders = new Collider[0];
+        [Tooltip("Nom du layer Unity pour les hitboxes.")]
+        [SerializeField] private string _hitboxLayerName = "Hitbox";
+        [Tooltip("Layer ID résolu automatiquement (ne pas modifier).")]
+        [SerializeField] private int _hitboxLayer = 8;
 
         private int _hitboxCount;
 
@@ -77,6 +81,24 @@ namespace M2922.Component.Health
         {
             base.OnValidate();
             _hitboxCount = _hitboxColliders != null ? _hitboxColliders.Length : 0;
+
+            // Résoudre le layer depuis le nom
+            _hitboxLayer = UnityEngine.LayerMask.NameToLayer(_hitboxLayerName);
+            if (_hitboxLayer < 0) _hitboxLayer = 8; // fallback
+
+            // Auto-assigner le layer à tous les colliders
+            if (_hitboxColliders != null)
+            {
+                for (int i = 0; i < _hitboxColliders.Length; i++)
+                {
+                    Collider col = _hitboxColliders[i];
+                    if (col != null && col.gameObject.layer != _hitboxLayer)
+                    {
+                        col.gameObject.layer = _hitboxLayer;
+                        UnityEditor.EditorUtility.SetDirty(col.gameObject);
+                    }
+                }
+            }
         }
 
         protected override void OnDrawGizmos()

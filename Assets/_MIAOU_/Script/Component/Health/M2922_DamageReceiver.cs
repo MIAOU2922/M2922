@@ -39,6 +39,43 @@ namespace M2922.Component.Health
         }
 
         /// <summary>
+        /// Applique des dégâts avec type élémentaire.
+        /// Le joueur calcule sa résistance avant d'appeler ApplyDamage.
+        /// </summary>
+        public void ApplyTypedDamage(float rawDamage, int damageTypeId, VRCPlayerApi source = null)
+        {
+            // === RÉSISTANCE ÉLÉMENTAIRE (calculée par le joueur) ===
+            float resistanceMult = GetElementalResistance(damageTypeId);
+            float typedDamage = rawDamage * resistanceMult;
+
+            // Déléguer au pipeline standard
+            ApplyDamage(typedDamage, source);
+        }
+
+        /// <summary>
+        /// Calcule la résistance à un type de dégât élémentaire.
+        /// Surchargeable : par défaut, lit depuis le ModifierContainer.
+        /// </summary>
+        private float GetElementalResistance(int damageTypeId)
+        {
+            // Par défaut : 1f (pas de résistance)
+            // Les modificateurs Custom00-Custom04 peuvent être utilisés
+            // pour stocker les résistances élémentaires
+            if (_modifierContainer == null) return 1f;
+
+            switch (damageTypeId)
+            {
+                case 0: return 1f; // Kinetic : pas de résistance spéciale
+                case 1: return _modifierContainer.GetMultiplicativeTotal(ModifierType.Custom00); // Solar resist
+                case 2: return _modifierContainer.GetMultiplicativeTotal(ModifierType.Custom01); // Arc resist
+                case 3: return _modifierContainer.GetMultiplicativeTotal(ModifierType.Custom02); // Void resist
+                case 4: return _modifierContainer.GetMultiplicativeTotal(ModifierType.Custom03); // Stasis resist
+                case 5: return _modifierContainer.GetMultiplicativeTotal(ModifierType.Custom04); // Strand resist
+                default: return 1f;
+            }
+        }
+
+        /// <summary>
         /// Applique des dégâts : invincibility check → shield → armor → health.
         /// </summary>
         public void ApplyDamage(float rawDamage, VRCPlayerApi source = null, bool isCrit = false)

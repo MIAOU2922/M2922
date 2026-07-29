@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c911940f4b0854b4d9cd3c73d60d367e, type: 3}
+  m_Name: Weapon_Def_AK47
+  m_EditorClassIdentifier: 
+  WeaponName: ak47
+  WeaponType: 0
+  DamageType: 0
+  Slot: 1
+  Rarity: 4
+  Description: 
+  Frame: {fileID: 11400000, guid: e3aa29363c8a90d40915949d4dd49b0a, type: 2}
+  PerkColumn1Pool:
+  - {fileID: 11400000, guid: e74650cf8bee1be4e8d23367b7e6fcf7, type: 2}
+  - {fileID: 11400000, guid: 8a05109b329685b41a03e238ca01b94f, type: 2}
+  - {fileID: 11400000, guid: 6fde167d9491f6e4cb5de0185dd0baca, type: 2}
+  - {fileID: 11400000, guid: 29435fec722fd3b4696299111f1a8d9d, type: 2}
+  PerkColumn2Pool:
+  - {fileID: 11400000, guid: eb7ff3a64fc2a9e43b6b53b6e64c7f6e, type: 2}
+  - {fileID: 11400000, guid: 5c63ef79321bbd443a4ff81d2c22c83f, type: 2}
+  - {fileID: 11400000, guid: 9772860ed8036dd439679daa550b1361, type: 2}
+  PerkColumn3Pool:
+  - {fileID: 11400000, guid: d9bc18930ad9d8d4e86bf8b547e32625, type: 2}
+  - {fileID: 11400000, guid: 60cb8188be2872549a58d9afccf5484c, type: 2}
+  PerkColumn4Pool:
+  - {fileID: 11400000, guid: a4516efa6fadde64ea55661e033feaad, type: 2}
+  - {fileID: 11400000, guid: 3991c69929e175c49bdd2aa2a71aeef2, type: 2}
+  MasterworkPool:
+  - {fileID: 11400000, guid: 7e0d2c45c14a6344fb657927cb252b4d, type: 2}
+  - {fileID: 11400000, guid: dc3c65044d803164b9e98228ce43eb85, type: 2}
+  - {fileID: 11400000, guid: 3850d9aca50c0bf4484c30a85edf598c, type: 2}
+  - {fileID: 11400000, guid: 4b82c2a33a95b6d4da423be07f578f77, type: 2}
+  - {fileID: 11400000, guid: 85e28842eb78900478a440a54c6cc167, type: 2}
+  - {fileID: 11400000, guid: bb4692d175c46534fb007951056bf116, type: 2}
+  - {fileID: 11400000, guid: 033506d3f27f97f4e82ff8aaafcee816, type: 2}
+  ModPool:
+  - {fileID: 11400000, guid: 9e5092e58a3626c4b910f82b5c80c862, type: 2}
+  - {fileID: 11400000, guid: 02ddfb9c4133c9d418307e269e983f39, type: 2}
+  - {fileID: 11400000, guid: 118924349e379354db68ede14e3c9075, type: 2}
+  - {fileID: 11400000, guid: c53b10fa8f105c5448c2d126c22addca, type: 2}
+  - {fileID: 11400000, guid: f70069261b418aa4fb9ea80bb951336b, type: 2}
+  - {fileID: 11400000, guid: bee44f464cc307843a92cac6620187be, type: 2}
+  - {fileID: 11400000, guid: 2ac827c382cc0364a919e541e7ab5723, type: 2}
+  - {fileID: 11400000, guid: a7aad41172362164f928839bea317ae2, type: 2}
+  - {fileID: 11400000, guid: 96449affa4720d7408e211b80511f245, type: 2}
+  - {fileID: 11400000, guid: d46b93520cae6094eab664bc79f51635, type: 2}
+  - {fileID: 11400000, guid: f854b64b40e3ead4b9098d61047f56b7, type: 2}
+  - {fileID: 11400000, guid: e349c44ed39977f4d9c1380dca0b91f9, type: 2}
+  - {fileID: 11400000, guid: 005857c2ee75c1a42b238d77127387d0, type: 2}
+  - {fileID: 11400000, guid: c36246e9c98d6ff47a83d252551b068c, type: 2}
+  - {fileID: 11400000, guid: 26fc8afd80e661b4cb1d0adb3ec92037, type: 2}
+  - {fileID: 11400000, guid: e89f4500286492c4d8ca4e78049ce2c0, type: 2}
+  - {fileID: 11400000, guid: cfa3a5162ef31f64881f5a8fbd986bbc, type: 2}
+  - {fileID: 11400000, guid: c45ed8255441dde46bde0344856e1925, type: 2}
+  - {fileID: 11400000, guid: 9e0a04bc6b33c2244829275ad91712b9, type: 2}
+  - {fileID: 11400000, guid: 957b9d08cfe2b284795d412ebaa0b8b5, type: 2}
+  - {fileID: 11400000, guid: c8f594c98bff393438a6971c33d8a60d, type: 2}
+  - {fileID: 11400000, guid: f920a03ff735701428fb9e14b40bbc4e, type: 2}
+  Icon: {fileID: 0}
+  WeaponPrefab: {fileID: 0}

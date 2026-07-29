@@ -1,0 +1,1436 @@
+{
+  "metadata": {
+    "title": "Destiny 2 Comprehensive Weapon Architecture & Stats Database",
+    "game": "Destiny 2",
+    "description": "Complete reference JSON for Destiny 2 weapon types, frame archetypes with base stats, perks, stats, masterworks, and mods.",
+    "version": "1.0"
+  },
+  "weapon_types": [
+    "Auto Rifle",
+    "Pulse Rifle",
+    "Scout Rifle",
+    "Hand Cannon",
+    "Submachine Gun",
+    "Sidearm",
+    "Combat Bow",
+    "Shotgun",
+    "Fusion Rifle",
+    "Sniper Rifle",
+    "Trace Rifle",
+    "Breech-Loaded Grenade Launcher",
+    "Heavy Grenade Launcher",
+    "Rocket Launcher",
+    "Linear Fusion Rifle",
+    "Machine Gun",
+    "Sword",
+    "Glaive",
+    "Rocket Sidearm"
+  ],
+  "stats_definitions": {
+    "Impact": "Determines the base damage output per projectile/hit.",
+    "Range": "Extends effective range before damage falloff and improves bullet magnetism / aim assistance cone.",
+    "Stability": "Reduces vertical recoil kick and reduces camera flinch when taking damage.",
+    "Handling": "Controls weapon ready speed, stow speed, and Aim Down Sights (ADS) transition speed.",
+    "Reload Speed": "Reduces the duration of the reload animation.",
+    "Aim Assistance": "Determines bullet magnetism width and target acquisition strength.",
+    "Zoom": "Magnification level when aiming down sights; scales effective damage falloff distance.",
+    "Airborne Effectiveness": "Affects accuracy and bullet magnetism penalties while airborne.",
+    "Recoil Direction": "Determines horizontal recoil tendency and predictability (ends in 5 for vertical recoil).",
+    "RPM": "Rounds per minute (rate of fire).",
+    "Charge Time": "Delay in milliseconds before a Fusion Rifle or Linear Fusion Rifle fires.",
+    "Draw Time": "Time in milliseconds required to fully draw a Combat Bow string.",
+    "Magazine": "Number of rounds loaded before needing a reload."
+  },
+  "masterworks": {
+    "standard_legendary": {
+      "stat_boost": 10,
+      "available_stats": [
+        "Range",
+        "Stability",
+        "Handling",
+        "Reload Speed",
+        "Aim Assistance",
+        "Blast Radius",
+        "Velocity",
+        "Draw Time",
+        "Charge Time",
+        "Impact (Swords)"
+      ]
+    },
+    "adept_legendary": {
+      "primary_stat_boost": 10,
+      "secondary_stat_boost": 3,
+      "note": "Masterworking an Adept weapon grants +10 to the selected stat and +3 to all other compatible base stats."
+    }
+  },
+  "mods": {
+    "standard_mods": [
+      {
+        "name": "Counterbalance Stock",
+        "effect": "+15 Recoil Direction"
+      },
+      {
+        "name": "Targeting Adjuster",
+        "effect": "+5 Aim Assistance"
+      },
+      {
+        "name": "Backup Mag",
+        "effect": "Increases magazine size capacity"
+      },
+      {
+        "name": "Icarus Grip",
+        "effect": "+15 Airborne Effectiveness"
+      },
+      {
+        "name": "Freehand Grip",
+        "effect": "Increases hip-fire accuracy and ready speed"
+      },
+      {
+        "name": "Sprint Grip",
+        "effect": "Temporarily increases ready speed and ADS speed after sprinting"
+      },
+      {
+        "name": "Radar Tuner",
+        "effect": "Radar returns immediately after aiming down sights"
+      },
+      {
+        "name": "Quick Access Sling",
+        "effect": "Increases weapon swap speed when empty or stowed"
+      },
+      {
+        "name": "Boss Spec",
+        "effect": "+7.7% damage against Bosses and Vehicles"
+      },
+      {
+        "name": "Major Spec",
+        "effect": "+7.7% damage against Powerful enemies and Champions"
+      },
+      {
+        "name": "Minor Spec",
+        "effect": "+7.7% damage against Rank-and-File enemies"
+      },
+      {
+        "name": "player Spec",
+        "effect": "+10% damage against player enemies"
+      }
+    ],
+    "adept_mods": [
+      {
+        "name": "Adept Range",
+        "effect": "+10 Range"
+      },
+      {
+        "name": "Adept Stability",
+        "effect": "+10 Stability"
+      },
+      {
+        "name": "Adept Handling",
+        "effect": "+10 Handling"
+      },
+      {
+        "name": "Adept Reload",
+        "effect": "+10 Reload Speed"
+      },
+      {
+        "name": "Adept Target Acquisition",
+        "effect": "+10 Aim Assistance, -5 Stability"
+      },
+      {
+        "name": "Adept Blast Radius",
+        "effect": "+10 Blast Radius"
+      },
+      {
+        "name": "Adept Velocity",
+        "effect": "+10 Velocity"
+      },
+      {
+        "name": "Adept Mag",
+        "effect": "+40% Magazine Size, -15 Handling"
+      },
+      {
+        "name": "Adept Icarus Grip",
+        "effect": "+15 Airborne Effectiveness, +5 Handling"
+      },
+      {
+        "name": "Adept Big Ones Spec",
+        "effect": "+7.7% damage against Powerful enemies, Champions, and Bosses"
+      }
+    ]
+  },
+  "frames_by_weapon_type": {
+    "Auto Rifle": [
+      {
+        "frame_name": "High-Impact Frame",
+        "rpm": 360,
+        "description": "Slow firing and high damage. This weapon is more accurate when stationary and aiming down sights.",
+        "base_stats": {
+          "Impact": 70,
+          "Range": 65,
+          "Stability": 35,
+          "Handling": 35,
+          "Reload Speed": 38,
+          "Aim Assistance": 40,
+          "Zoom": 16,
+          "Recoil Direction": 75,
+          "Airborne Effectiveness": 10,
+          "Magazine": 32
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 450,
+        "description": "This weapon's recoil pattern is more predictably vertical.",
+        "base_stats": {
+          "Impact": 29,
+          "Range": 55,
+          "Stability": 50,
+          "Handling": 45,
+          "Reload Speed": 46,
+          "Aim Assistance": 50,
+          "Zoom": 16,
+          "Recoil Direction": 95,
+          "Airborne Effectiveness": 10,
+          "Magazine": 34
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 600,
+        "description": "A well-rounded grip, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 21,
+          "Range": 45,
+          "Stability": 48,
+          "Handling": 52,
+          "Reload Speed": 50,
+          "Aim Assistance": 60,
+          "Zoom": 16,
+          "Recoil Direction": 60,
+          "Airborne Effectiveness": 10,
+          "Magazine": 41
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 720,
+        "description": "Deeper ammo reserves. Slightly faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 18,
+          "Range": 35,
+          "Stability": 42,
+          "Handling": 58,
+          "Reload Speed": 62,
+          "Aim Assistance": 70,
+          "Zoom": 16,
+          "Recoil Direction": 50,
+          "Airborne Effectiveness": 10,
+          "Magazine": 52
+        }
+      },
+      {
+        "frame_name": "Support Frame",
+        "rpm": 450,
+        "description": "Fires healing projectiles when hip-fired, damage rounds when aimed.",
+        "base_stats": {
+          "Impact": 29,
+          "Range": 50,
+          "Stability": 55,
+          "Handling": 50,
+          "Reload Speed": 52,
+          "Aim Assistance": 55,
+          "Zoom": 16,
+          "Recoil Direction": 85,
+          "Airborne Effectiveness": 15,
+          "Magazine": 36
+        }
+      }
+    ],
+    "Pulse Rifle": [
+      {
+        "frame_name": "High-Impact Frame",
+        "rpm": 340,
+        "description": "Slow-firing and high-damage. This weapon is more accurate when stationary and aiming down sights.",
+        "base_stats": {
+          "Impact": 33,
+          "Range": 68,
+          "Stability": 52,
+          "Handling": 34,
+          "Reload Speed": 38,
+          "Aim Assistance": 38,
+          "Zoom": 17,
+          "Recoil Direction": 70,
+          "Airborne Effectiveness": 10,
+          "Magazine": 30
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 390,
+        "description": "A well-rounded grip, reliable and sturdy. 3-round burst.",
+        "base_stats": {
+          "Impact": 29,
+          "Range": 55,
+          "Stability": 58,
+          "Handling": 48,
+          "Reload Speed": 48,
+          "Aim Assistance": 50,
+          "Zoom": 17,
+          "Recoil Direction": 60,
+          "Airborne Effectiveness": 10,
+          "Magazine": 33
+        }
+      },
+      {
+        "frame_name": "Aggressive Burst",
+        "rpm": 450,
+        "description": "Hard-hitting 4-round burst.",
+        "base_stats": {
+          "Impact": 27,
+          "Range": 62,
+          "Stability": 55,
+          "Handling": 40,
+          "Reload Speed": 42,
+          "Aim Assistance": 45,
+          "Zoom": 17,
+          "Recoil Direction": 65,
+          "Airborne Effectiveness": 10,
+          "Magazine": 36
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 450,
+        "description": "Superb handling. Move faster with this weapon equipped. 3-round burst.",
+        "base_stats": {
+          "Impact": 25,
+          "Range": 42,
+          "Stability": 50,
+          "Handling": 68,
+          "Reload Speed": 60,
+          "Aim Assistance": 60,
+          "Zoom": 17,
+          "Recoil Direction": 55,
+          "Airborne Effectiveness": 10,
+          "Magazine": 30
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 540,
+        "description": "Deeper ammo reserves. Slightly faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 23,
+          "Range": 38,
+          "Stability": 48,
+          "Handling": 58,
+          "Reload Speed": 55,
+          "Aim Assistance": 68,
+          "Zoom": 17,
+          "Recoil Direction": 50,
+          "Airborne Effectiveness": 10,
+          "Magazine": 36
+        }
+      },
+      {
+        "frame_name": "Heavy Burst",
+        "rpm": "2-burst",
+        "description": "Fires a hard-hitting 2-round burst.",
+        "base_stats": {
+          "Impact": 35,
+          "Range": 70,
+          "Stability": 50,
+          "Handling": 38,
+          "Reload Speed": 40,
+          "Aim Assistance": 42,
+          "Zoom": 17,
+          "Recoil Direction": 75,
+          "Airborne Effectiveness": 10,
+          "Magazine": 28
+        }
+      }
+    ],
+    "Scout Rifle": [
+      {
+        "frame_name": "High-Impact Frame",
+        "rpm": 150,
+        "description": "Slow-firing and high-damage. Accurate when stationary and aiming down sights.",
+        "base_stats": {
+          "Impact": 67,
+          "Range": 75,
+          "Stability": 32,
+          "Handling": 32,
+          "Reload Speed": 35,
+          "Aim Assistance": 32,
+          "Zoom": 20,
+          "Recoil Direction": 75,
+          "Airborne Effectiveness": 10,
+          "Magazine": 13
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 180,
+        "description": "Recoil pattern is more predictably vertical.",
+        "base_stats": {
+          "Impact": 62,
+          "Range": 62,
+          "Stability": 48,
+          "Handling": 46,
+          "Reload Speed": 48,
+          "Aim Assistance": 45,
+          "Zoom": 20,
+          "Recoil Direction": 95,
+          "Airborne Effectiveness": 10,
+          "Magazine": 16
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 200,
+        "description": "Superb handling. Move faster with this weapon equipped.",
+        "base_stats": {
+          "Impact": 60,
+          "Range": 50,
+          "Stability": 42,
+          "Handling": 68,
+          "Reload Speed": 58,
+          "Aim Assistance": 60,
+          "Zoom": 20,
+          "Recoil Direction": 55,
+          "Airborne Effectiveness": 10,
+          "Magazine": 16
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 260,
+        "description": "Full auto. Deeper ammo reserves. Faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 45,
+          "Range": 42,
+          "Stability": 45,
+          "Handling": 52,
+          "Reload Speed": 52,
+          "Aim Assistance": 68,
+          "Zoom": 20,
+          "Recoil Direction": 50,
+          "Airborne Effectiveness": 10,
+          "Magazine": 19
+        }
+      }
+    ],
+    "Hand Cannon": [
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 120,
+        "description": "High damage, high recoil. Hard-hitting and long-range.",
+        "base_stats": {
+          "Impact": 92,
+          "Range": 68,
+          "Stability": 30,
+          "Handling": 30,
+          "Reload Speed": 32,
+          "Aim Assistance": 60,
+          "Zoom": 14,
+          "Recoil Direction": 88,
+          "Airborne Effectiveness": 10,
+          "Magazine": 8
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 140,
+        "description": "A well-rounded grip, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 84,
+          "Range": 50,
+          "Stability": 50,
+          "Handling": 48,
+          "Reload Speed": 50,
+          "Aim Assistance": 70,
+          "Zoom": 14,
+          "Recoil Direction": 90,
+          "Airborne Effectiveness": 10,
+          "Magazine": 10
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 180,
+        "description": "Predictable vertical recoil. High in-air accuracy.",
+        "base_stats": {
+          "Impact": 78,
+          "Range": 42,
+          "Stability": 62,
+          "Handling": 56,
+          "Reload Speed": 58,
+          "Aim Assistance": 65,
+          "Zoom": 14,
+          "Recoil Direction": 95,
+          "Airborne Effectiveness": 20,
+          "Magazine": 12
+        }
+      },
+      {
+        "frame_name": "Heavy Burst",
+        "rpm": 256,
+        "description": "Fires a hard-hitting 2-round burst.",
+        "base_stats": {
+          "Impact": 80,
+          "Range": 58,
+          "Stability": 45,
+          "Handling": 40,
+          "Reload Speed": 42,
+          "Aim Assistance": 55,
+          "Zoom": 14,
+          "Recoil Direction": 80,
+          "Airborne Effectiveness": 10,
+          "Magazine": 16
+        }
+      }
+    ],
+    "Submachine Gun": [
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 720,
+        "description": "High damage, high recoil. Deals extra damage at close range.",
+        "base_stats": {
+          "Impact": 22,
+          "Range": 55,
+          "Stability": 25,
+          "Handling": 55,
+          "Reload Speed": 35,
+          "Aim Assistance": 45,
+          "Zoom": 14,
+          "Recoil Direction": 85,
+          "Airborne Effectiveness": 10,
+          "Magazine": 27
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 900,
+        "description": "A well-rounded grip, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 15,
+          "Range": 40,
+          "Stability": 45,
+          "Handling": 60,
+          "Reload Speed": 50,
+          "Aim Assistance": 55,
+          "Zoom": 14,
+          "Recoil Direction": 90,
+          "Airborne Effectiveness": 10,
+          "Magazine": 34
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 900,
+        "description": "Superb handling. Move faster with this weapon equipped.",
+        "base_stats": {
+          "Impact": 15,
+          "Range": 35,
+          "Stability": 42,
+          "Handling": 72,
+          "Reload Speed": 58,
+          "Aim Assistance": 60,
+          "Zoom": 14,
+          "Recoil Direction": 93,
+          "Airborne Effectiveness": 10,
+          "Magazine": 32
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 600,
+        "description": "Recoil pattern is more predictably vertical.",
+        "base_stats": {
+          "Impact": 25,
+          "Range": 58,
+          "Stability": 55,
+          "Handling": 38,
+          "Reload Speed": 42,
+          "Aim Assistance": 50,
+          "Zoom": 14,
+          "Recoil Direction": 95,
+          "Airborne Effectiveness": 10,
+          "Magazine": 26
+        }
+      }
+    ],
+    "Sidearm": [
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 300,
+        "description": "A well-rounded single-shot sidearm, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 49,
+          "Range": 40,
+          "Stability": 65,
+          "Handling": 60,
+          "Reload Speed": 52,
+          "Aim Assistance": 70,
+          "Zoom": 12,
+          "Recoil Direction": 85,
+          "Airborne Effectiveness": 10,
+          "Magazine": 12
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 260,
+        "description": "Predictable vertical recoil.",
+        "base_stats": {
+          "Impact": 55,
+          "Range": 48,
+          "Stability": 70,
+          "Handling": 50,
+          "Reload Speed": 48,
+          "Aim Assistance": 65,
+          "Zoom": 12,
+          "Recoil Direction": 95,
+          "Airborne Effectiveness": 15,
+          "Magazine": 12
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 360,
+        "description": "Superb handling. Move faster with this weapon equipped.",
+        "base_stats": {
+          "Impact": 43,
+          "Range": 35,
+          "Stability": 50,
+          "Handling": 78,
+          "Reload Speed": 62,
+          "Aim Assistance": 75,
+          "Zoom": 12,
+          "Recoil Direction": 90,
+          "Airborne Effectiveness": 10,
+          "Magazine": 15
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 450,
+        "description": "Full auto. Deeper ammo reserves. Faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 35,
+          "Range": 30,
+          "Stability": 52,
+          "Handling": 65,
+          "Reload Speed": 55,
+          "Aim Assistance": 80,
+          "Zoom": 12,
+          "Recoil Direction": 80,
+          "Airborne Effectiveness": 10,
+          "Magazine": 18
+        }
+      },
+      {
+        "frame_name": "Adaptive Burst",
+        "rpm": 491,
+        "description": "3-round burst sidearm.",
+        "base_stats": {
+          "Impact": 33,
+          "Range": 38,
+          "Stability": 58,
+          "Handling": 55,
+          "Reload Speed": 50,
+          "Aim Assistance": 72,
+          "Zoom": 12,
+          "Recoil Direction": 88,
+          "Airborne Effectiveness": 10,
+          "Magazine": 15
+        }
+      },
+      {
+        "frame_name": "Aggressive Burst",
+        "rpm": 325,
+        "description": "Hard-hitting 2-round burst.",
+        "base_stats": {
+          "Impact": 56,
+          "Range": 45,
+          "Stability": 45,
+          "Handling": 42,
+          "Reload Speed": 40,
+          "Aim Assistance": 60,
+          "Zoom": 12,
+          "Recoil Direction": 85,
+          "Airborne Effectiveness": 10,
+          "Magazine": 12
+        }
+      }
+    ],
+    "Rocket Sidearm": [
+      {
+        "frame_name": "Rocket-Assisted Frame",
+        "rpm": 100,
+        "description": "Fires self-propelled explosive rocket ammunition. High single-target and area damage.",
+        "base_stats": {
+          "Impact": 60,
+          "Range": 50,
+          "Stability": 50,
+          "Handling": 45,
+          "Reload Speed": 40,
+          "Aim Assistance": 60,
+          "Zoom": 12,
+          "Recoil Direction": 80,
+          "Airborne Effectiveness": 10,
+          "Magazine": 12
+        }
+      }
+    ],
+    "Combat Bow": [
+      {
+        "frame_name": "Precision Frame",
+        "draw_time": 680,
+        "description": "Compound bow. Longer draw time, higher damage and accuracy.",
+        "base_stats": {
+          "Impact": 76,
+          "Accuracy": 80,
+          "Stability": 60,
+          "Handling": 50,
+          "Reload Speed": 40,
+          "Aim Assistance": 65,
+          "Zoom": 18,
+          "Airborne Effectiveness": 15
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "draw_time": 580,
+        "description": "Recurve bow. Faster draw time, superb handling and movement speed.",
+        "base_stats": {
+          "Impact": 68,
+          "Accuracy": 60,
+          "Stability": 45,
+          "Handling": 72,
+          "Reload Speed": 60,
+          "Aim Assistance": 75,
+          "Zoom": 18,
+          "Airborne Effectiveness": 15
+        }
+      }
+    ],
+    "Shotgun": [
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 55,
+        "description": "Hard-hitting, high recoil. Increases rate of fire after a kill.",
+        "base_stats": {
+          "Impact": 80,
+          "Range": 30,
+          "Stability": 25,
+          "Handling": 30,
+          "Reload Speed": 35,
+          "Aim Assistance": 35,
+          "Zoom": 12,
+          "Airborne Effectiveness": 2,
+          "Magazine": 5
+        }
+      },
+      {
+        "frame_name": "Precision Frame (Pellet)",
+        "rpm": 65,
+        "description": "Recoil pattern is more predictably vertical.",
+        "base_stats": {
+          "Impact": 70,
+          "Range": 60,
+          "Stability": 45,
+          "Handling": 45,
+          "Reload Speed": 48,
+          "Aim Assistance": 45,
+          "Zoom": 12,
+          "Airborne Effectiveness": 2,
+          "Magazine": 5
+        }
+      },
+      {
+        "frame_name": "Precision Frame (Slug)",
+        "rpm": 65,
+        "description": "Fires a single precision slug projectile.",
+        "base_stats": {
+          "Impact": 75,
+          "Range": 65,
+          "Stability": 50,
+          "Handling": 50,
+          "Reload Speed": 50,
+          "Aim Assistance": 60,
+          "Zoom": 12,
+          "Airborne Effectiveness": 5,
+          "Magazine": 6
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 80,
+        "description": "Superb handling. Move faster with this weapon equipped.",
+        "base_stats": {
+          "Impact": 65,
+          "Range": 45,
+          "Stability": 40,
+          "Handling": 70,
+          "Reload Speed": 58,
+          "Aim Assistance": 55,
+          "Zoom": 12,
+          "Airborne Effectiveness": 2,
+          "Magazine": 6
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 140,
+        "description": "Full auto. Faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 55,
+          "Range": 32,
+          "Stability": 35,
+          "Handling": 48,
+          "Reload Speed": 62,
+          "Aim Assistance": 65,
+          "Zoom": 12,
+          "Airborne Effectiveness": 2,
+          "Magazine": 7
+        }
+      }
+    ],
+    "Fusion Rifle": [
+      {
+        "frame_name": "High-Impact Frame",
+        "charge_time": 960,
+        "description": "Slow charging, high damage. Accurate when stationary and aiming down sights.",
+        "base_stats": {
+          "Impact": 95,
+          "Range": 65,
+          "Stability": 35,
+          "Handling": 30,
+          "Reload Speed": 32,
+          "Aim Assistance": 35,
+          "Zoom": 15,
+          "Airborne Effectiveness": 5
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "charge_time": 780,
+        "description": "Recoil pattern is predictably vertical.",
+        "base_stats": {
+          "Impact": 80,
+          "Range": 55,
+          "Stability": 52,
+          "Handling": 42,
+          "Reload Speed": 44,
+          "Aim Assistance": 55,
+          "Zoom": 15,
+          "Airborne Effectiveness": 5
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "charge_time": 660,
+        "description": "A well-rounded burst, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 70,
+          "Range": 48,
+          "Stability": 48,
+          "Handling": 50,
+          "Reload Speed": 50,
+          "Aim Assistance": 60,
+          "Zoom": 15,
+          "Airborne Effectiveness": 5
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "charge_time": 500,
+        "description": "Faster charge time. Deeper ammo reserves. Faster reload when empty.",
+        "base_stats": {
+          "Impact": 55,
+          "Range": 35,
+          "Stability": 40,
+          "Handling": 58,
+          "Reload Speed": 58,
+          "Aim Assistance": 68,
+          "Zoom": 15,
+          "Airborne Effectiveness": 5
+        }
+      }
+    ],
+    "Sniper Rifle": [
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 72,
+        "description": "High damage, high recoil.",
+        "base_stats": {
+          "Impact": 90,
+          "Range": 78,
+          "Stability": 30,
+          "Handling": 30,
+          "Reload Speed": 35,
+          "Aim Assistance": 38,
+          "Zoom": 50,
+          "Airborne Effectiveness": 3,
+          "Magazine": 3
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 90,
+        "description": "A well-rounded grip, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 70,
+          "Range": 62,
+          "Stability": 45,
+          "Handling": 46,
+          "Reload Speed": 44,
+          "Aim Assistance": 60,
+          "Zoom": 45,
+          "Airborne Effectiveness": 3,
+          "Magazine": 4
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 140,
+        "description": "Deeper ammo reserves. Slightly faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 55,
+          "Range": 42,
+          "Stability": 38,
+          "Handling": 65,
+          "Reload Speed": 60,
+          "Aim Assistance": 72,
+          "Zoom": 40,
+          "Airborne Effectiveness": 3,
+          "Magazine": 5
+        }
+      }
+    ],
+    "Trace Rifle": [
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 1000,
+        "description": "Fires a steady beam of elemental energy.",
+        "base_stats": {
+          "Impact": 6,
+          "Range": 60,
+          "Stability": 75,
+          "Handling": 55,
+          "Reload Speed": 50,
+          "Aim Assistance": 100,
+          "Zoom": 16,
+          "Airborne Effectiveness": 15,
+          "Magazine": 94
+        }
+      }
+    ],
+    "Breech-Loaded Grenade Launcher": [
+      {
+        "frame_name": "Lightweight Frame",
+        "rpm": 90,
+        "description": "Superb handling. Hold fire to launch, release to detonate.",
+        "base_stats": {
+          "Blast Radius": 50,
+          "Velocity": 75,
+          "Stability": 30,
+          "Handling": 72,
+          "Reload Speed": 65,
+          "Aim Assistance": 70,
+          "Zoom": 12,
+          "Magazine": 1
+        }
+      },
+      {
+        "frame_name": "Wave Frame",
+        "rpm": 90,
+        "description": "Launches a projectile that releases a wave of energy along the ground upon impact.",
+        "base_stats": {
+          "Blast Radius": 100,
+          "Velocity": 70,
+          "Stability": 32,
+          "Handling": 68,
+          "Reload Speed": 60,
+          "Aim Assistance": 60,
+          "Zoom": 12,
+          "Magazine": 1
+        }
+      }
+    ],
+    "Heavy Grenade Launcher": [
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 120,
+        "description": "A well-rounded launcher, reliable and sturdy.",
+        "base_stats": {
+          "Blast Radius": 50,
+          "Velocity": 60,
+          "Stability": 45,
+          "Handling": 48,
+          "Reload Speed": 48,
+          "Aim Assistance": 60,
+          "Magazine": 6
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 150,
+        "description": "Deeper ammo reserves. Faster reload when empty.",
+        "base_stats": {
+          "Blast Radius": 35,
+          "Velocity": 50,
+          "Stability": 38,
+          "Handling": 58,
+          "Reload Speed": 62,
+          "Aim Assistance": 65,
+          "Magazine": 7
+        }
+      },
+      {
+        "frame_name": "Compressed Wave Frame",
+        "rpm": 90,
+        "description": "Launches a heavy wave of energy along the ground upon impact.",
+        "base_stats": {
+          "Blast Radius": 100,
+          "Velocity": 65,
+          "Stability": 40,
+          "Handling": 42,
+          "Reload Speed": 40,
+          "Aim Assistance": 50,
+          "Magazine": 4
+        }
+      }
+    ],
+    "Rocket Launcher": [
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 25,
+        "description": "High damage, high recoil. High projectile velocity.",
+        "base_stats": {
+          "Blast Radius": 50,
+          "Velocity": 75,
+          "Stability": 40,
+          "Handling": 42,
+          "Reload Speed": 42,
+          "Aim Assistance": 65,
+          "Magazine": 1
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 20,
+        "description": "A well-rounded rocket launcher, reliable and sturdy.",
+        "base_stats": {
+          "Blast Radius": 60,
+          "Velocity": 60,
+          "Stability": 45,
+          "Handling": 45,
+          "Reload Speed": 45,
+          "Aim Assistance": 60,
+          "Magazine": 1
+        }
+      },
+      {
+        "frame_name": "Precision Frame",
+        "rpm": 15,
+        "description": "Fires tracking rockets. Lower base damage than other frames.",
+        "base_stats": {
+          "Blast Radius": 50,
+          "Velocity": 45,
+          "Stability": 50,
+          "Handling": 48,
+          "Reload Speed": 40,
+          "Aim Assistance": 50,
+          "Magazine": 1
+        }
+      },
+      {
+        "frame_name": "High-Impact Frame",
+        "rpm": 15,
+        "description": "Slow firing, maximum blast radius.",
+        "base_stats": {
+          "Blast Radius": 95,
+          "Velocity": 40,
+          "Stability": 30,
+          "Handling": 35,
+          "Reload Speed": 35,
+          "Aim Assistance": 45,
+          "Magazine": 1
+        }
+      }
+    ],
+    "Linear Fusion Rifle": [
+      {
+        "frame_name": "Precision Frame",
+        "charge_time": 533,
+        "description": "Fires a long-range precision energy beam.",
+        "base_stats": {
+          "Impact": 41,
+          "Range": 35,
+          "Stability": 45,
+          "Handling": 38,
+          "Reload Speed": 38,
+          "Aim Assistance": 60,
+          "Zoom": 25,
+          "Magazine": 5
+        }
+      },
+      {
+        "frame_name": "Aggressive Burst",
+        "charge_time": 533,
+        "description": "Fires a 3-round burst of precision energy beams.",
+        "base_stats": {
+          "Impact": 35,
+          "Range": 42,
+          "Stability": 38,
+          "Handling": 32,
+          "Reload Speed": 32,
+          "Aim Assistance": 50,
+          "Zoom": 25,
+          "Magazine": 6
+        }
+      }
+    ],
+    "Machine Gun": [
+      {
+        "frame_name": "High-Impact Frame",
+        "rpm": 360,
+        "description": "Slow firing and high damage. Accurate when stationary and aiming down sights.",
+        "base_stats": {
+          "Impact": 70,
+          "Range": 68,
+          "Stability": 32,
+          "Handling": 32,
+          "Reload Speed": 35,
+          "Aim Assistance": 40,
+          "Zoom": 16,
+          "Magazine": 45
+        }
+      },
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 450,
+        "description": "A well-rounded grip, reliable and sturdy.",
+        "base_stats": {
+          "Impact": 53,
+          "Range": 55,
+          "Stability": 48,
+          "Handling": 45,
+          "Reload Speed": 45,
+          "Aim Assistance": 55,
+          "Zoom": 16,
+          "Magazine": 60
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 900,
+        "description": "Deeper ammo reserves. Slightly faster reload when magazine is empty.",
+        "base_stats": {
+          "Impact": 25,
+          "Range": 38,
+          "Stability": 40,
+          "Handling": 55,
+          "Reload Speed": 62,
+          "Aim Assistance": 70,
+          "Zoom": 16,
+          "Magazine": 85
+        }
+      }
+    ],
+    "Sword": [
+      {
+        "frame_name": "Adaptive Frame",
+        "swing_speed": 40,
+        "description": "Well-rounded sword. Heavy upper-cut attack.",
+        "base_stats": {
+          "Impact": 60,
+          "Swing Speed": 40,
+          "Guard Resistance": 50,
+          "Guard Efficiency": 50,
+          "Charge Rate": 50,
+          "Ammo Capacity": 60
+        }
+      },
+      {
+        "frame_name": "Aggressive Frame",
+        "swing_speed": 28,
+        "description": "Heavy slam attack that damages surrounding enemies.",
+        "base_stats": {
+          "Impact": 70,
+          "Swing Speed": 28,
+          "Guard Resistance": 60,
+          "Guard Efficiency": 40,
+          "Charge Rate": 35,
+          "Ammo Capacity": 55
+        }
+      },
+      {
+        "frame_name": "Lightweight Frame",
+        "swing_speed": 50,
+        "description": "Fast continuous light attacks and dashing heavy attack. Increases movement speed.",
+        "base_stats": {
+          "Impact": 52,
+          "Swing Speed": 50,
+          "Guard Resistance": 40,
+          "Guard Efficiency": 60,
+          "Charge Rate": 65,
+          "Ammo Capacity": 65
+        }
+      },
+      {
+        "frame_name": "Caster Frame",
+        "swing_speed": 40,
+        "description": "Heavy attack launches a heavy projectile that lingers and explodes.",
+        "base_stats": {
+          "Impact": 58,
+          "Swing Speed": 40,
+          "Guard Resistance": 50,
+          "Guard Efficiency": 50,
+          "Charge Rate": 40,
+          "Ammo Capacity": 50
+        }
+      },
+      {
+        "frame_name": "Vortex Frame",
+        "swing_speed": 40,
+        "description": "Heavy attack performs a spinning area-of-effect attack.",
+        "base_stats": {
+          "Impact": 62,
+          "Swing Speed": 40,
+          "Guard Resistance": 50,
+          "Guard Efficiency": 50,
+          "Charge Rate": 45,
+          "Ammo Capacity": 60
+        }
+      }
+    ],
+    "Glaive": [
+      {
+        "frame_name": "Adaptive Frame",
+        "rpm": 80,
+        "description": "Hybrid melee and ranged weapon with a energy shield guard.",
+        "base_stats": {
+          "Impact": 80,
+          "Range": 50,
+          "Shield Duration": 50,
+          "Handling": 50,
+          "Reload Speed": 50,
+          "Magazine": 4
+        }
+      },
+      {
+        "frame_name": "Aggressive Frame",
+        "rpm": 55,
+        "description": "Harder hitting ranged shots and melee, slower fire rate.",
+        "base_stats": {
+          "Impact": 95,
+          "Range": 60,
+          "Shield Duration": 40,
+          "Handling": 35,
+          "Reload Speed": 35,
+          "Magazine": 3
+        }
+      },
+      {
+        "frame_name": "Rapid-Fire Frame",
+        "rpm": 95,
+        "description": "Faster projectile fire rate and reload speed.",
+        "base_stats": {
+          "Impact": 68,
+          "Range": 40,
+          "Shield Duration": 60,
+          "Handling": 60,
+          "Reload Speed": 65,
+          "Magazine": 5
+        }
+      }
+    ]
+  },
+  "perk_categories": {
+    "column_1_barrels_sights": [
+      {
+        "name": "Hammer-Forged Rifling",
+        "stats": {
+          "Range": "+10"
+        }
+      },
+      {
+        "name": "Extended Barrel",
+        "stats": {
+          "Range": "+10",
+          "Recoil Direction": "+10",
+          "Handling": "-10"
+        }
+      },
+      {
+        "name": "Arrowhead Brake",
+        "stats": {
+          "Recoil Direction": "+30",
+          "Handling": "+10"
+        }
+      },
+      {
+        "name": "Corkscrew Rifling",
+        "stats": {
+          "Range": "+5",
+          "Stability": "+5",
+          "Handling": "+5"
+        }
+      },
+      {
+        "name": "Fluted Barrel",
+        "stats": {
+          "Handling": "+15",
+          "Stability": "+5"
+        }
+      },
+      {
+        "name": "Full Bore",
+        "stats": {
+          "Range": "+15",
+          "Stability": "-10",
+          "Handling": "-5"
+        }
+      },
+      {
+        "name": "Smallbore",
+        "stats": {
+          "Range": "+7",
+          "Stability": "+7"
+        }
+      },
+      {
+        "name": "Polygonal Rifling",
+        "stats": {
+          "Stability": "+10"
+        }
+      },
+      {
+        "name": "Full Choke",
+        "stats": {
+          "Description": "Reduces pellet spread when aiming down sights"
+        }
+      },
+      {
+        "name": "Rifled Barrel",
+        "stats": {
+          "Range": "+10",
+          "Handling": "-15"
+        }
+      }
+    ],
+    "column_2_magazines_battery": [
+      {
+        "name": "Accurized Rounds",
+        "stats": {
+          "Range": "+10"
+        }
+      },
+      {
+        "name": "Tactical Mag",
+        "stats": {
+          "Stability": "+5",
+          "Reload Speed": "+10",
+          "Magazine": "+10"
+        }
+      },
+      {
+        "name": "Appended Mag",
+        "stats": {
+          "Magazine": "+20"
+        }
+      },
+      {
+        "name": "Extended Mag",
+        "stats": {
+          "Magazine": "+30",
+          "Reload Speed": "-20"
+        }
+      },
+      {
+        "name": "Flared Magwell",
+        "stats": {
+          "Reload Speed": "+15",
+          "Stability": "+5"
+        }
+      },
+      {
+        "name": "Steady Rounds",
+        "stats": {
+          "Stability": "+15",
+          "Airborne Effectiveness": "+7",
+          "Range": "-5"
+        }
+      },
+      {
+        "name": "High-Caliber Rounds",
+        "stats": {
+          "Range": "+5",
+          "Description": "Knocks targets back slightly"
+        }
+      },
+      {
+        "name": "Ricochet Rounds",
+        "stats": {
+          "Range": "+5",
+          "Stability": "+10"
+        }
+      },
+      {
+        "name": "Spike Grenades",
+        "stats": {
+          "Description": "Direct hits with grenade launchers deal bonus damage"
+        }
+      },
+      {
+        "name": "Impact Casing",
+        "stats": {
+          "Description": "Direct hits with rockets deal bonus damage"
+        }
+      }
+    ],
+    "column_3_utility_traits": [
+      "Outlaw",
+      "Rapid Hit",
+      "Demolitionist",
+      "Pugilist",
+      "Stats for All",
+      "Subsistence",
+      "Envious Assassin",
+      "Overflow",
+      "Auto-Loading Holster",
+      "Reconstruction",
+      "Keep Away",
+      "Heal Clip",
+      "Loose Change",
+      "Perpetual Motion",
+      "Surplus",
+      "Moving Target"
+    ],
+    "column_4_damage_traits": [
+      "Rampage",
+      "Kill Clip",
+      "Multikill Clip",
+      "Swashbuckler",
+      "Frenzy",
+      "One for All",
+      "Target Lock",
+      "Bait and Switch",
+      "Vorpal Weapon",
+      "Explosive Payload",
+      "Timed Payload",
+      "Voltshot",
+      "Incandescent",
+      "Headstone",
+      "Hatchling",
+      "Destabilizing Rounds",
+      "Precision Instrument",
+      "Adrenaline Junkie",
+      "Golden Tricorn",
+      "Firefly",
+      "Dragonfly"
+    ]
+  }
+}

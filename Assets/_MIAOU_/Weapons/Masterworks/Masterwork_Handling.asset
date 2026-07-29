@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: eba9d14d5137d0d49905560599b300e0, type: 3}
+  m_Name: Masterwork_Handling
+  m_EditorClassIdentifier: 
+  MasterworkName: Masterwork (Handling)
+  PrimaryStat: 2
+  PrimaryBoost: 10
+  SecondaryBoost: 0
+  Description: 'Standard masterwork : +10 Handling'
+  IsAdept: 0
