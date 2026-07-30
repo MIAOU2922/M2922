@@ -20,7 +20,7 @@ MonoBehaviour:
     Range: 40
     Stability: 0
     Handling: 60
-    ReloadSpeed: 0
+    ReloadSpeed: 65
     AimAssistance: 0
     Zoom: 0
     AirborneEffectiveness: 0
@@ -36,5 +36,5 @@ MonoBehaviour:
     GuardEfficiency: 0
     ChargeRate: 0
     AmmoCapacity: 0
-    ShieldDuration: 0
+    ShieldDuration: 60
     Accuracy: 0

@@ -161,6 +161,11 @@ namespace M2922.Component.Weapon
         public float BlastRadius { get { return _finalBlastRadius; } }
         public float Velocity { get { return _finalVelocity; } }
 
+        // Stats BAKÉES de la frame (utilisées par le gizmo et l'éditeur)
+        public float BakedFrameRange { get { return _bakedFrameRange; } }
+        public float BakedFrameStability { get { return _bakedFrameStability; } }
+        public float BakedFrameAimAssistance { get { return _bakedFrameAimAssistance; } }
+
         // Noms des perks/masterwork/mod rollés
         public string RolledPerk1Name { get { return GetPoolName(_bakedPerk1PoolNames, _rolledPerk1Index); } }
         public string RolledPerk2Name { get { return GetPoolName(_bakedPerk2PoolNames, _rolledPerk2Index); } }

@@ -41,5 +41,5 @@ MonoBehaviour:
   BossDamageMultiplier: 1
   MajorDamageMultiplier: 1
   MinorDamageMultiplier: 1.077
-  TakenDamageMultiplier: 1
+  PlayerDamageMultiplier: 1
   Icon: {fileID: 0}

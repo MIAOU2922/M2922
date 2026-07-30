@@ -10,10 +10,10 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fae216677817b7d4d8ac0614be81d650, type: 3}
-  m_Name: Mod_Player_Spec
+  m_Name: Mod_player_Spec
   m_EditorClassIdentifier: 
-  ModName: Taken Spec
-  Description: +10% damage against players enemies
+  ModName: player Spec
+  Description: +10% damage against player enemies
   CompatibleWeaponTypes: 
   StatModifiers:
     Impact: 0
@@ -41,5 +41,5 @@ MonoBehaviour:
   BossDamageMultiplier: 1
   MajorDamageMultiplier: 1
   MinorDamageMultiplier: 1
-  PlayerDamageMultiplier: 1.077
+  PlayerDamageMultiplier: 1
   Icon: {fileID: 0}

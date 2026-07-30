@@ -62,10 +62,16 @@ namespace M2922.Component.Weapon
         private float _fireCooldown = 0f;
         private float _fireInterval = 0.1f;
         private int _burstRemaining = 0;
+        private int _burstTotal = 0;       // total de la rafale (pour progresion)
         private float _burstDelay = 0.06f;
         private float _chargeTimer = 0f;
         private bool _isCharging = false;
         private bool _beamActive = false;
+        private float _currentSpreadMult = 1f; // multiplicateur de spread (rafale)
+        private float _bloomAccum = 0f;        // accumulation bloom en tir continu
+        private float _bloomPerShot = 0.3f;    // +0.3 par tir full auto
+        private float _bloomDecay = 2f;        // -2/sec à l'arrêt
+        private float _bloomMaxMult = 5f;      // cap du multiplicateur (x5 max)
 
         // --- OWNERSHIP ---
         private VRCPlayerApi _localPlayer;
@@ -192,6 +198,14 @@ namespace M2922.Component.Weapon
             if (_fireCooldown > 0f)
                 _fireCooldown -= Time.deltaTime;
 
+            // Bloom : se résorbe quand on ne tire pas
+            if (!_triggerHeld && _bloomAccum > 0f)
+            {
+                _bloomAccum -= _bloomDecay * Time.deltaTime;
+                if (_bloomAccum < 0f) _bloomAccum = 0f;
+                UpdateSpreadMult();
+            }
+
             switch (_fireMode)
             {
                 case FireMode.FullAuto:   UpdateFullAuto(); break;
@@ -216,6 +230,11 @@ namespace M2922.Component.Weapon
         {
             if (_triggerHeld && _fireCooldown <= 0f && CanFire())
             {
+                // Accumuler le bloom
+                _bloomAccum += _bloomPerShot;
+                if (_bloomAccum > _bloomMaxMult) _bloomAccum = _bloomMaxMult;
+                UpdateSpreadMult();
+
                 DoFire();
                 _fireCooldown = _fireInterval;
             }
@@ -225,6 +244,10 @@ namespace M2922.Component.Weapon
         {
             if (_triggerJustPressed && _fireCooldown <= 0f && CanFire())
             {
+                _bloomAccum += _bloomPerShot * 0.5f;
+                if (_bloomAccum > _bloomMaxMult) _bloomAccum = _bloomMaxMult;
+                UpdateSpreadMult();
+
                 DoFire();
                 _fireCooldown = _fireInterval;
             }
@@ -235,9 +258,17 @@ namespace M2922.Component.Weapon
             if (_triggerJustPressed && _burstRemaining <= 0 && _fireCooldown <= 0f && CanFire())
             {
                 _burstRemaining = FireModeMapping.GetBurstCount(_weaponType);
+                _burstTotal = _burstRemaining;
             }
             if (_burstRemaining > 0 && _fireCooldown <= 0f && CanFire())
             {
+                // Bloom s'accumule + progression intra-rafale
+                _bloomAccum += _bloomPerShot * 0.5f;
+                if (_bloomAccum > _bloomMaxMult) _bloomAccum = _bloomMaxMult;
+                float progress = 1f - ((float)_burstRemaining / (float)_burstTotal);
+                _currentSpreadMult = 1f + progress * 2f + _bloomAccum;
+                if (_currentSpreadMult > _bloomMaxMult + 3f) _currentSpreadMult = _bloomMaxMult + 3f;
+
                 DoFire();
                 _burstRemaining = _burstRemaining - 1;
                 _fireCooldown = _burstDelay;
@@ -271,6 +302,10 @@ namespace M2922.Component.Weapon
         {
             if (_triggerJustPressed && _fireCooldown <= 0f)
             {
+                _bloomAccum += _bloomPerShot * 0.5f;
+                if (_bloomAccum > _bloomMaxMult) _bloomAccum = _bloomMaxMult;
+                UpdateSpreadMult();
+
                 DoFire();
                 _fireCooldown = _fireInterval;
             }
@@ -423,16 +458,39 @@ namespace M2922.Component.Weapon
         private Vector3 GetSpreadDirection(int pellets)
         {
             Quaternion baseRot = GetMuzzleRot();
+            float baseAngle = GetSpreadAngle() * _currentSpreadMult;
+
             if (pellets <= 1)
-                return baseRot * GetSpreadRotation() * Vector3.forward;
+            {
+                float x = Random.Range(-baseAngle, baseAngle);
+                float y = Random.Range(-baseAngle, baseAngle);
+                return baseRot * Quaternion.Euler(x, y, 0f) * Vector3.forward;
+            }
 
-            // Shotgun/Fusion : chaque pellet a son propre angle dans le cône
-            float spreadAngle = (100f - _weapon.AimAssistance) / 100f;
-            spreadAngle = Mathf.Clamp(spreadAngle * 3f, 0.5f, 15f);
-
-            float angleX = Random.Range(-spreadAngle, spreadAngle);
-            float angleY = Random.Range(-spreadAngle, spreadAngle);
+            // Multi-pellet (Shotgun/Fusion) : cône élargi
+            float mult = 8f;
+            float angleX = Random.Range(-mult, mult) * baseAngle;
+            float angleY = Random.Range(-mult, mult) * baseAngle;
             return baseRot * Quaternion.Euler(angleX, angleY, 0f) * Vector3.forward;
+        }
+
+        /// <summary>
+        /// Retourne l'angle de spread (demi-angle du cône) basé sur Range, Stability, AimAssistance.
+        /// </summary>
+        private float GetSpreadAngle()
+        {
+            float rangeFactor = Mathf.Clamp(1f - (_weapon.Range / 100f), 0.1f, 1f);
+            float stabilityFactor = Mathf.Clamp(1f - (_weapon.Stability / 100f), 0.1f, 1f);
+            float aaFactor = Mathf.Clamp(1f - (_weapon.AimAssistance / 100f), 0.1f, 1f);
+            return 2f * rangeFactor * stabilityFactor * aaFactor;
+        }
+
+        /// <summary>
+        /// Met à jour _currentSpreadMult selon le bloom accumulé.
+        /// </summary>
+        private void UpdateSpreadMult()
+        {
+            _currentSpreadMult = 1f + _bloomAccum;
         }
 
         // ===================================================
@@ -515,21 +573,9 @@ namespace M2922.Component.Weapon
 
         private Quaternion GetSpreadRotation()
         {
-            // Calcul du spread basé sur les stats de l'arme
-            // Range élevé = cône serré, Stability élevée = moins de bloom
-            // AimAssistance élevée = moins de spread
-
-            float rangeFactor = Mathf.Clamp(1f - (_weapon.Range / 100f), 0.1f, 1f);
-            float stabilityFactor = Mathf.Clamp(1f - (_weapon.Stability / 100f), 0.1f, 1f);
-            float aaFactor = Mathf.Clamp(1f - (_weapon.AimAssistance / 100f), 0.1f, 1f);
-
-            // Spread de base en degrés (plus petit = plus précis)
-            float baseSpread = 2f * rangeFactor * stabilityFactor * aaFactor;
-
-            // Ajouter un peu d'aléatoire dans le cône
+            float baseSpread = GetSpreadAngle();
             float spreadX = Random.Range(-baseSpread, baseSpread);
             float spreadY = Random.Range(-baseSpread, baseSpread);
-
             return Quaternion.Euler(spreadX, spreadY, 0f);
         }
 
@@ -653,12 +699,15 @@ namespace M2922.Component.Weapon
 
             Vector3 origin = GetMuzzlePos();
             Quaternion baseRot = GetMuzzleRot();
-            float range = 10f; // longueur fixe pour le gizmo
+            float range = 10f;
 
-            // Calculer le spread comme dans GetSpreadRotation
-            float rangeFactor = Mathf.Clamp(1f - (_weapon.Range / 100f), 0.1f, 1f);
-            float stabilityFactor = Mathf.Clamp(1f - (_weapon.Stability / 100f), 0.1f, 1f);
-            float aaFactor = Mathf.Clamp(1f - (_weapon.AimAssistance / 100f), 0.1f, 1f);
+            // Utiliser les stats BAKÉES (finales = 0 en éditeur avant Start)
+            float bkdRange = _weapon.BakedFrameRange;
+            float bkdStab = _weapon.BakedFrameStability;
+            float bkdAA = _weapon.BakedFrameAimAssistance;
+            float rangeFactor = Mathf.Clamp(1f - (bkdRange / 100f), 0.1f, 1f);
+            float stabilityFactor = Mathf.Clamp(1f - (bkdStab / 100f), 0.1f, 1f);
+            float aaFactor = Mathf.Clamp(1f - (bkdAA / 100f), 0.1f, 1f);
             float baseSpread = 2f * rangeFactor * stabilityFactor * aaFactor;
 
             // Direction centrale
@@ -723,11 +772,36 @@ namespace M2922.Component.Weapon
             }
 
             // Label spread
-#if UNITY_EDITOR
             UnityEditor.Handles.color = new Color(1f, 0.5f, 0f, alpha);
             UnityEditor.Handles.Label(pCenter + Vector3.up * 0.2f,
-                "Spread: " + baseSpread.ToString("F1") + "°");
-#endif
+                "Base: " + baseSpread.ToString("F1") + "°");
+
+            // === Cône MAX BLOOM (rouge, plus court) ===
+            float maxSpread = baseSpread * (1f + _bloomMaxMult);
+            float maxRange = range * 0.7f;
+            Color maxCol = new Color(1f, 0.2f, 0.2f, alpha * 0.35f);
+
+            Gizmos.color = maxCol;
+            Gizmos.DrawLine(origin, origin + baseRot * Quaternion.Euler(0f, maxSpread, 0f) * Vector3.forward * maxRange);
+            Gizmos.DrawLine(origin, origin + baseRot * Quaternion.Euler(0f, -maxSpread, 0f) * Vector3.forward * maxRange);
+            Gizmos.DrawLine(origin, origin + baseRot * Quaternion.Euler(maxSpread, 0f, 0f) * Vector3.forward * maxRange);
+            Gizmos.DrawLine(origin, origin + baseRot * Quaternion.Euler(-maxSpread, 0f, 0f) * Vector3.forward * maxRange);
+
+            prevPoint = Vector3.zero;
+            for (int i = 0; i <= segments; i++)
+            {
+                float a = (float)i / segments * Mathf.PI * 2f;
+                Quaternion r = baseRot * Quaternion.Euler(Mathf.Sin(a) * maxSpread, Mathf.Cos(a) * maxSpread, 0f);
+                Vector3 pt = origin + r * Vector3.forward * maxRange;
+                if (i > 0) Gizmos.DrawLine(prevPoint, pt);
+                prevPoint = pt;
+            }
+
+            Vector3 mCtr = origin + centerDir * maxRange;
+            UnityEditor.Handles.color = maxCol;
+            UnityEditor.Handles.Label(mCtr + Vector3.up * 0.15f,
+                "Max Bloom: " + maxSpread.ToString("F1") + "°");
+
         }
 
 #endif

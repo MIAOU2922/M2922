@@ -149,35 +149,64 @@ namespace M2922.Component.Weapon.Editor
                         asset.Description = frameEntry.description ?? "";
 
                         // Stats de base
+                        // JsonUtility ne supporte pas les clés avec espaces
+                        // ("Reload Speed", "Aim Assistance", "Recoil Direction", etc.)
+                        // → on les extrait manuellement du JSON brut
+                        float reloadSpeed = ExtractFloatValue(frameObjJson, "Reload Speed");
+                        float aimAssist = ExtractFloatValue(frameObjJson, "Aim Assistance");
+                        float recoilDir = ExtractFloatValue(frameObjJson, "Recoil Direction");
+                        float airborneEff = ExtractFloatValue(frameObjJson, "Airborne Effectiveness");
+                        float blastRadius = ExtractFloatValue(frameObjJson, "Blast Radius");
+                        float swingSpeed = ExtractFloatValue(frameObjJson, "Swing Speed");
+                        float guardResist = ExtractFloatValue(frameObjJson, "Guard Resistance");
+                        float guardEff = ExtractFloatValue(frameObjJson, "Guard Efficiency");
+                        float chargeRate = ExtractFloatValue(frameObjJson, "Charge Rate");
+                        float ammoCap = ExtractFloatValue(frameObjJson, "Ammo Capacity");
+                        float shieldDur = ExtractFloatValue(frameObjJson, "Shield Duration");
+                        float drawTime = ExtractFloatValue(frameObjJson, "Draw Time");
+                        float chargeTime = ExtractFloatValue(frameObjJson, "Charge Time");
+                        float accuracy = ExtractFloatValue(frameObjJson, "Accuracy");
+
+                        // Stats parsées par JsonUtility (clés sans espace)
+                        float impact = 0f, range = 0f, stability = 0f, handling = 0f, zoom = 0f, velocity = 0f;
+                        int magazine = 0;
                         if (frameEntry.base_stats != null)
                         {
                             var bs = frameEntry.base_stats;
-                            asset.BaseStats = new WeaponBaseStats
-                            {
-                                Impact = bs.Impact,
-                                Range = bs.Range,
-                                Stability = bs.Stability,
-                                Handling = bs.Handling,
-                                ReloadSpeed = bs.ReloadSpeed,
-                                AimAssistance = bs.AimAssistance,
-                                Zoom = bs.Zoom,
-                                RecoilDirection = bs.RecoilDirection,
-                                AirborneEffectiveness = bs.AirborneEffectiveness,
-                                Magazine = bs.Magazine,
-                                BlastRadius = bs.BlastRadius,
-                                Velocity = bs.Velocity,
-                                Accuracy = bs.Accuracy,
-                                SwingSpeed = bs.SwingSpeed,
-                                GuardResistance = bs.GuardResistance,
-                                GuardEfficiency = bs.GuardEfficiency,
-                                ChargeRate = bs.ChargeRate,
-                                AmmoCapacity = bs.AmmoCapacity,
-                                ShieldDuration = bs.ShieldDuration,
-                                RPM = frameEntry.rpm,
-                                ChargeTime = frameEntry.charge_time + bs.ChargeTime,
-                                DrawTime = frameEntry.draw_time + bs.DrawTime
-                            };
+                            impact = bs.Impact;
+                            range = bs.Range;
+                            stability = bs.Stability;
+                            handling = bs.Handling;
+                            zoom = bs.Zoom;
+                            velocity = bs.Velocity;
+                            magazine = bs.Magazine;
                         }
+
+                        asset.BaseStats = new WeaponBaseStats
+                        {
+                            Impact = impact,
+                            Range = range,
+                            Stability = stability,
+                            Handling = handling,
+                            ReloadSpeed = reloadSpeed,
+                            AimAssistance = aimAssist,
+                            Zoom = zoom,
+                            RecoilDirection = recoilDir,
+                            AirborneEffectiveness = airborneEff,
+                            Magazine = magazine,
+                            BlastRadius = blastRadius,
+                            Velocity = velocity,
+                            Accuracy = accuracy,
+                            SwingSpeed = swingSpeed,
+                            GuardResistance = guardResist,
+                            GuardEfficiency = guardEff,
+                            ChargeRate = chargeRate,
+                            AmmoCapacity = (int)ammoCap,
+                            ShieldDuration = shieldDur,
+                            RPM = frameEntry.rpm,
+                            ChargeTime = frameEntry.charge_time + chargeTime,
+                            DrawTime = frameEntry.draw_time + drawTime
+                        };
 
                         string fileName = "Frame_" + JsonStatParser.SanitizeFileName(weaponTypeKey)
                             + "_" + JsonStatParser.SanitizeFileName(frameEntry.frame_name) + ".asset";
@@ -525,6 +554,36 @@ namespace M2922.Component.Weapon.Editor
             }
 
             return 1f;
+        }
+
+        /// <summary>
+        /// Extrait une valeur float d'un objet JSON par clé.
+        /// Gère les clés avec espaces que JsonUtility ne supporte pas.
+        /// Ex: Extraire "Reload Speed": 50 d'un objet JSON.
+        /// </summary>
+        private static float ExtractFloatValue(string jsonObject, string key)
+        {
+            // Chercher "key":
+            string searchKey = "\"" + key + "\"";
+            int keyIdx = jsonObject.IndexOf(searchKey, System.StringComparison.Ordinal);
+            if (keyIdx < 0) return 0f;
+
+            // Chercher ':' après la clé
+            int colonIdx = jsonObject.IndexOf(':', keyIdx + searchKey.Length);
+            if (colonIdx < 0) return 0f;
+
+            // Extraire la valeur après ':'
+            string afterColon = jsonObject.Substring(colonIdx + 1).Trim();
+            // Prendre jusqu'à ',' ou '}' ou '\n'
+            int endIdx = afterColon.IndexOfAny(new char[] { ',', '}', '\n', '\r' });
+            if (endIdx < 0) endIdx = afterColon.Length;
+            string valStr = afterColon.Substring(0, endIdx).Trim();
+
+            if (float.TryParse(valStr, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out float result))
+                return result;
+
+            return 0f;
         }
 
         private static void EnsureDirectory(string path)

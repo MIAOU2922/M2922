@@ -31,10 +31,10 @@ MonoBehaviour:
     Magazine: 0
     BlastRadius: 0
     Velocity: 0
-    SwingSpeed: 0
-    GuardResistance: 0
-    GuardEfficiency: 0
-    ChargeRate: 0
-    AmmoCapacity: 0
+    SwingSpeed: 40
+    GuardResistance: 50
+    GuardEfficiency: 50
+    ChargeRate: 50
+    AmmoCapacity: 60
     ShieldDuration: 0
     Accuracy: 0

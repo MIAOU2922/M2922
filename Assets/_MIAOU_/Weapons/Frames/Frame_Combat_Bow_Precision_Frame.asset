@@ -20,10 +20,10 @@ MonoBehaviour:
     Range: 0
     Stability: 60
     Handling: 50
-    ReloadSpeed: 0
-    AimAssistance: 0
+    ReloadSpeed: 40
+    AimAssistance: 65
     Zoom: 18
-    AirborneEffectiveness: 0
+    AirborneEffectiveness: 15
     RecoilDirection: 0
     RPM: 0
     ChargeTime: 0
