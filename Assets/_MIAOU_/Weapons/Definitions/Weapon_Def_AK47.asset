@@ -18,7 +18,7 @@ MonoBehaviour:
   Slot: 1
   Rarity: 4
   Description: 
-  Frame: {fileID: 11400000, guid: 1b3628792c03a3644a626b79e921684f, type: 2}
+  Frame: {fileID: 11400000, guid: 308c84bbdb9d223428f187d014951abf, type: 2}
   PerkColumn1Pool:
   - {fileID: 0}
   - {fileID: 0}
