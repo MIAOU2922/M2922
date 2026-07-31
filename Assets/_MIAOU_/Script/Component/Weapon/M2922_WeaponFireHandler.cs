@@ -438,21 +438,21 @@ namespace M2922.Component.Weapon
             // Falloff : dégâts complets à courte portée, réduits à longue portée
             float baseDamage = _weapon.Impact * 0.5f;
 
-            // Début du falloff à 50% de la range max
-            float falloffStart = maxRange * 0.4f;
+            // Début du falloff à 65% de la range max (Open World)
+            float falloffStart = maxRange * 0.65f;
             if (distance <= falloffStart) return baseDamage;
 
-            // Falloff linéaire de 100% à 50% des dégâts
+            // Falloff linéaire de 100% à 40% des dégâts (au lieu de 50%)
             float t = (distance - falloffStart) / (maxRange - falloffStart);
             t = Mathf.Clamp01(t);
-            return Mathf.Lerp(baseDamage, baseDamage * 0.5f, t);
+            return Mathf.Lerp(baseDamage, baseDamage * 0.4f, t);
         }
 
         private float GetEffectiveRange()
         {
             float baseRange = FireModeMapping.GetHitscanRange(_weaponType);
-            // Le Range stat et le Zoom étendent la portée
-            return baseRange + (_weapon.Range * 0.3f) + (_weapon.Zoom * 0.5f);
+            // Le Range stat et le Zoom étendent la portée (coefficients Open World)
+            return baseRange + (_weapon.Range * 0.8f) + (_weapon.Zoom * 1.2f);
         }
 
         private Vector3 GetSpreadDirection(int pellets)

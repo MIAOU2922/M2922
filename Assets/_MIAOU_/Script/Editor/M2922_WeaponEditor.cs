@@ -14,10 +14,15 @@ namespace M2922.Component.Weapon.Editor
         private M2922_Weapon _target;
         private SerializedObject _so;
 
+        // Cache des noms pour les popups (reconstruit après chaque bake)
+        private string[][] _poolDisplayNames;
+        private bool _needsRefreshDisplayNames = true;
+
         private void OnEnable()
         {
             _target = (M2922_Weapon)target;
             _so = new SerializedObject(_target);
+            _needsRefreshDisplayNames = true;
         }
 
         public override void OnInspectorGUI()
@@ -39,14 +44,20 @@ namespace M2922.Component.Weapon.Editor
                 doBake = true;
 
             if (doBake && _target._weaponDefinition != null)
+            {
                 BakeFromDefinition(_target._weaponDefinition);
+                _needsRefreshDisplayNames = true;
+            }
 
             // Rafraîchir après bake
             _so.Update();
 
             string bakedName = SP("_bakedWeaponName")?.stringValue;
-            if (!string.IsNullOrEmpty(bakedName))
+            bool hasBakedData = !string.IsNullOrEmpty(bakedName)
+                || !string.IsNullOrEmpty(SP("_bakedFrameName")?.stringValue);
+            if (hasBakedData)
             {
+                // ---- BAKED DATA ----
                 EditorGUILayout.Space();
                 EditorGUILayout.LabelField("=== BAKED DATA ===", EditorStyles.boldLabel);
                 EditorGUILayout.LabelField("Name", bakedName);
@@ -57,14 +68,57 @@ namespace M2922.Component.Weapon.Editor
                 EditorGUILayout.LabelField("Frame", SP("_bakedFrameName")?.stringValue);
                 EditorGUILayout.LabelField("Magazine", IV("_bakedFrameMagazine").ToString());
                 EditorGUILayout.LabelField("RPM", FV("_bakedFrameRPM").ToString("F0"));
-                EditorGUILayout.LabelField("Impact", FV("_bakedFrameImpact").ToString("F1"));
-                EditorGUILayout.LabelField("Range", FV("_bakedFrameRange").ToString("F1"));
+
+                float baseImpact = FV("_bakedFrameImpact");
+                float baseRange = FV("_bakedFrameRange");
+                float baseZoom = FV("_bakedFrameZoom");
+                WeaponType wt = (WeaponType)IV("_bakedWeaponType");
+                float dmgMult = GetRawDamageMultiplier(wt);
+                float effRange = GetEffectiveRange(wt, baseRange, baseZoom);
+
+                EditorGUILayout.LabelField("Impact (frame)", $"{baseImpact:F1}  →  raw dmg: {baseImpact * dmgMult:F1}");
+                EditorGUILayout.LabelField("Range  (frame)", $"{baseRange:F1}  →  portee: {effRange:F1}m  falloff@{effRange * 0.4f:F1}m");
                 EditorGUILayout.LabelField("Stability", FV("_bakedFrameStability").ToString("F1"));
                 EditorGUILayout.LabelField("Handling", FV("_bakedFrameHandling").ToString("F1"));
                 EditorGUILayout.LabelField("Reload", FV("_bakedFrameReloadSpeed").ToString("F1"));
                 EditorGUILayout.LabelField("AA", FV("_bakedFrameAimAssistance").ToString("F1"));
                 EditorGUILayout.LabelField("RecoilDir", FV("_bakedFrameRecoilDirection").ToString("F1"));
                 EditorGUILayout.LabelField("Airborne", FV("_bakedFrameAirborneEffectiveness").ToString("F1"));
+
+                // ---- PREVIEW SELECTION ----
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField("=== PREVIEW SELECTION ===", EditorStyles.boldLabel);
+
+                RefreshDisplayNames();
+
+                DrawPoolPopup("Perk 1", "_previewPerk1Index", 0);
+                DrawPoolPopup("Perk 2", "_previewPerk2Index", 1);
+                DrawPoolPopup("Perk 3", "_previewPerk3Index", 2);
+                DrawPoolPopup("Perk 4", "_previewPerk4Index", 3);
+                DrawPoolPopup("Masterwork", "_previewMasterworkIndex", 4);
+                DrawPoolPopup("Mod", "_previewModIndex", 5);
+
+                // ---- COMPUTED PREVIEW STATS ----
+                EditorGUILayout.Space();
+                EditorGUILayout.LabelField("=== COMPUTED STATS (preview) ===", EditorStyles.boldLabel);
+
+                int[] previewIndices = {
+                    IV("_previewPerk1Index"), IV("_previewPerk2Index"),
+                    IV("_previewPerk3Index"), IV("_previewPerk4Index"),
+                    IV("_previewMasterworkIndex"), IV("_previewModIndex")
+                };
+
+                float previewImpact = ComputePreviewStat(0, previewIndices);
+                float previewRange  = ComputePreviewStat(1, previewIndices);
+                float previewZoom   = ComputePreviewStat(6, previewIndices);
+                float previewDmgMult = GetRawDamageMultiplier((WeaponType)IV("_bakedWeaponType"));
+                float previewEffRange = GetEffectiveRange((WeaponType)IV("_bakedWeaponType"), previewRange, previewZoom);
+
+                Color oldColor = GUI.color;
+                GUI.color = Color.green;
+                EditorGUILayout.LabelField("Impact  (reel)", $"{previewImpact:F1}  →  raw dmg: {previewImpact * previewDmgMult:F1}");
+                EditorGUILayout.LabelField("Range   (reel)", $"{previewRange:F1}  →  portee: {previewEffRange:F1}m  falloff@{previewEffRange * 0.4f:F1}m");
+                GUI.color = oldColor;
             }
             else
             {
@@ -123,10 +177,11 @@ namespace M2922.Component.Weapon.Editor
 
             _so.ApplyModifiedProperties();
             EditorUtility.SetDirty(_target);
-            Debug.Log("[WeaponEditor] Bake OK: " + def.WeaponName
-                + " | Imp=" + def.Frame.BaseStats.Impact
-                + " Rng=" + def.Frame.BaseStats.Range
-                + " Stab=" + def.Frame.BaseStats.Stability);
+            string frameInfo = (def.Frame != null)
+                ? $"Imp={def.Frame.BaseStats.Impact} Rng={def.Frame.BaseStats.Range} Stab={def.Frame.BaseStats.Stability}"
+                : "NO FRAME";
+            Debug.Log("[WeaponEditor] Bake OK: " + (def.WeaponName ?? "(unnamed)")
+                + " | " + frameInfo);
         }
 
         private void BakePerkPool(WeaponPerkData[] pool, string nProp, string sProp, int stride)
@@ -232,6 +287,124 @@ namespace M2922.Component.Weapon.Editor
             var p = SP(n); if (p == null) return;
             p.ClearArray(); p.arraySize = v.Length;
             for (int i = 0; i < v.Length; i++) p.GetArrayElementAtIndex(i).floatValue = v[i];
+        }
+
+        // ===================================================
+        // PREVIEW SELECTION HELPERS
+        // ===================================================
+
+        private static readonly string[] _poolNameProps = {
+            "_bakedPerk1PoolNames", "_bakedPerk2PoolNames",
+            "_bakedPerk3PoolNames", "_bakedPerk4PoolNames",
+            "_bakedMasterworkPoolNames", "_bakedModPoolNames"
+        };
+
+        private void RefreshDisplayNames()
+        {
+            if (!_needsRefreshDisplayNames && _poolDisplayNames != null) return;
+            _needsRefreshDisplayNames = false;
+
+            _poolDisplayNames = new string[6][];
+            for (int p = 0; p < 6; p++)
+            {
+                var sp = SP(_poolNameProps[p]);
+                int count = (sp != null) ? sp.arraySize : 0;
+                _poolDisplayNames[p] = new string[count + 1];
+                _poolDisplayNames[p][0] = "Random";
+                for (int i = 0; i < count; i++)
+                    _poolDisplayNames[p][i + 1] = sp.GetArrayElementAtIndex(i).stringValue;
+            }
+        }
+
+        private void DrawPoolPopup(string label, string indexProp, int poolIdx)
+        {
+            var sp = SP(indexProp);
+            if (sp == null) return;
+            if (_poolDisplayNames == null || poolIdx >= _poolDisplayNames.Length) return;
+
+            string[] names = _poolDisplayNames[poolIdx];
+            if (names == null || names.Length <= 1)
+            {
+                EditorGUILayout.LabelField(label, "(pool vide)");
+                return;
+            }
+
+            // -1 = Random, mappé à l'index 0 du tableau d'affichage
+            int displayIdx = sp.intValue + 1;
+            if (displayIdx < 0 || displayIdx >= names.Length) displayIdx = 0;
+
+            EditorGUI.BeginChangeCheck();
+            int newDisplayIdx = EditorGUILayout.Popup(label, displayIdx, names);
+            if (EditorGUI.EndChangeCheck())
+            {
+                sp.intValue = newDisplayIdx - 1; // -1 pour Random, 0..N pour les perks
+            }
+        }
+
+        /// <summary>
+        /// Calcule la stat preview pour l'index de stat donné (0=Impact, 1=Range).
+        /// frame + somme des contributions des pools aux indices choisis.
+        /// </summary>
+        private float ComputePreviewStat(int statIndex, int[] previewIndices)
+        {
+            const int S = 16;
+
+            string[] statProps = {
+                "_bakedPerk1PoolStats", "_bakedPerk2PoolStats",
+                "_bakedPerk3PoolStats", "_bakedPerk4PoolStats",
+                "_bakedMasterworkPoolStats", "_bakedModPoolStats"
+            };
+
+            float total = 0f;
+            if (statIndex == 0) total = FV("_bakedFrameImpact");
+            else if (statIndex == 1) total = FV("_bakedFrameRange");
+            else if (statIndex == 6) total = FV("_bakedFrameZoom");
+
+            for (int p = 0; p < 6; p++)
+            {
+                int idx = previewIndices[p];
+                if (idx < 0) continue; // Random = pas de contribution (on ne sait pas)
+
+                var sp = SP(statProps[p]);
+                if (sp == null) continue;
+                int count = sp.arraySize / S;
+                if (idx >= count) continue;
+
+                total += sp.GetArrayElementAtIndex(idx * S + statIndex).floatValue;
+            }
+            return total;
+        }
+
+        /// <summary>
+        /// Multiplicateur Impact → raw damage selon le type d'arme.
+        /// Hitscan: ×0.5 | Projectile/Melee: ×2 | Beam: ×10
+        /// </summary>
+        private static float GetRawDamageMultiplier(WeaponType wt)
+        {
+            switch (wt)
+            {
+                case WeaponType.Sword:
+                case WeaponType.Glaive:
+                case WeaponType.RocketLauncher:
+                case WeaponType.BreechLoadedGrenadeLauncher:
+                case WeaponType.HeavyGrenadeLauncher:
+                case WeaponType.RocketSidearm:
+                    return 2f;
+                case WeaponType.TraceRifle:
+                    return 10f;
+                default: // Hitscan
+                    return 0.5f;
+            }
+        }
+
+        /// <summary>
+        /// Portée effective = portée de base du type d'arme + Range×0.8 + Zoom×1.2.
+        /// Reproduit M2922_WeaponFireHandler.GetEffectiveRange().
+        /// </summary>
+        private static float GetEffectiveRange(WeaponType wt, float rangeStat, float zoomStat)
+        {
+            float baseRange = FireModeMapping.GetHitscanRange(wt);
+            return baseRange + (rangeStat * 0.8f) + (zoomStat * 1.2f);
         }
     }
 }

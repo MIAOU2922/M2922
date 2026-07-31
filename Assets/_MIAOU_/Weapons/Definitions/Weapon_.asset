@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c911940f4b0854b4d9cd3c73d60d367e, type: 3}
+  m_Name: Weapon_
+  m_EditorClassIdentifier: 
+  WeaponName: Test
+  WeaponType: 0
+  DamageType: 0
+  Slot: 1
+  Rarity: 4
+  Description: 
+  Frame: {fileID: 11400000, guid: 8b8f78f014e62cd41a9be033b31c37c6, type: 2}
+  PerkColumn1Pool: []
+  PerkColumn2Pool: []
+  PerkColumn3Pool: []
+  PerkColumn4Pool: []
+  MasterworkPool: []
+  ModPool: []
+  Icon: {fileID: 0}
+  WeaponPrefab: {fileID: 0}

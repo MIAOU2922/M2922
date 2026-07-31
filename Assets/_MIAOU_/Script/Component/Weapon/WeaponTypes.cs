@@ -209,19 +209,19 @@ namespace M2922.Component.Weapon
         {
             switch (type)
             {
-                case WeaponType.Shotgun: return 15f;
-                case WeaponType.Sidearm: return 30f;
-                case WeaponType.SubmachineGun: return 40f;
-                case WeaponType.FusionRifle: return 45f;
-                case WeaponType.HandCannon: return 60f;
-                case WeaponType.AutoRifle: return 70f;
-                case WeaponType.PulseRifle: return 80f;
-                case WeaponType.MachineGun: return 80f;
-                case WeaponType.CombatBow: return 90f;
-                case WeaponType.ScoutRifle: return 100f;
-                case WeaponType.SniperRifle: return 150f;
-                case WeaponType.LinearFusionRifle: return 120f;
-                default: return 50f;
+                case WeaponType.Shotgun: return 25f;
+                case WeaponType.Sidearm: return 45f;
+                case WeaponType.SubmachineGun: return 65f;
+                case WeaponType.FusionRifle: return 75f;
+                case WeaponType.HandCannon: return 90f;
+                case WeaponType.AutoRifle: return 120f;
+                case WeaponType.PulseRifle: return 150f;
+                case WeaponType.MachineGun: return 160f;
+                case WeaponType.CombatBow: return 180f;
+                case WeaponType.ScoutRifle: return 220f;
+                case WeaponType.SniperRifle: return 400f;
+                case WeaponType.LinearFusionRifle: return 250f;
+                default: return 100f;
             }
         }
     }

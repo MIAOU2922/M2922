@@ -25,7 +25,16 @@ namespace M2922.Component.Weapon
         // #if + NonSerialized = double protection
         // ===================================================
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
-        [System.NonSerialized] public WeaponDefinition _weaponDefinition;
+        public WeaponDefinition _weaponDefinition;
+
+        [Header("=== EDITOR PREVIEW (selection manuelle) ===")]
+        [Tooltip("-1 = Random (tire au sort au runtime) ; 0..N = selection fixe")]
+        [SerializeField] private int _previewPerk1Index = -1;
+        [SerializeField] private int _previewPerk2Index = -1;
+        [SerializeField] private int _previewPerk3Index = -1;
+        [SerializeField] private int _previewPerk4Index = -1;
+        [SerializeField] private int _previewMasterworkIndex = -1;
+        [SerializeField] private int _previewModIndex = -1;
 #endif
 
         // ===================================================
