@@ -1,29 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c911940f4b0854b4d9cd3c73d60d367e, type: 3}
-  m_Name: Weapon_Def_AK47 adaptative
-  m_EditorClassIdentifier: 
-  WeaponName: ak47
-  WeaponType: 0
-  DamageType: 0
-  Slot: 1
-  Rarity: 4
-  Description: 
-  Frame: {fileID: 11400000, guid: e3aa29363c8a90d40915949d4dd49b0a, type: 2}
-  PerkColumn1Pool: []
-  PerkColumn2Pool: []
-  PerkColumn3Pool: []
-  PerkColumn4Pool: []
-  MasterworkPool: []
-  ModPool: []
-  Icon: {fileID: 0}
-  WeaponPrefab: {fileID: 0}
+version https://git-lfs.github.com/spec/v1
+oid sha256:b794afae9b0000905302d3b6acafcb7ad1de9def67dc0b5994acb66f34d4d808
+size 752

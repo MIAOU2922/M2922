@@ -1,20 +1,3 @@
-%YAML 1.1
-%TAG !u! tag:unity3d.com,2011:
---- !u!114 &11400000
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: eba9d14d5137d0d49905560599b300e0, type: 3}
-  m_Name: Masterwork_Range
-  m_EditorClassIdentifier: 
-  MasterworkName: Masterwork (Range)
-  PrimaryStat: 0
-  PrimaryBoost: 10
-  SecondaryBoost: 0
-  Description: 'Standard masterwork : +10 Range'
-  IsAdept: 0
+version https://git-lfs.github.com/spec/v1
+oid sha256:c1a840429be612fac2e08d3fb80c981e4bed746ecb399871df42409f9b3dfad9
+size 580
