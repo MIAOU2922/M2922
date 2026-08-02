@@ -114,7 +114,7 @@ namespace M2922.Component.Weapon
                 receiver = other.GetComponentInParent<M2922_DamageReceiver>();
             if (receiver != null)
             {
-                receiver.ApplyTypedDamage(_damage * zoneMult, _damageType, _owner);
+                receiver.SendDamage(_damage * zoneMult, _damageType, _owner);
             }
 
             ReturnToPool();

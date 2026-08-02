@@ -9,6 +9,7 @@ namespace M2922.Component.Weapon.Editor
     /// sans dépendre de la méthode #if-guarded BakeWeaponData().
     /// </summary>
     [CustomEditor(typeof(M2922_Weapon))]
+    [CanEditMultipleObjects]
     public class M2922_WeaponEditor : UnityEditor.Editor
     {
         private M2922_Weapon _target;

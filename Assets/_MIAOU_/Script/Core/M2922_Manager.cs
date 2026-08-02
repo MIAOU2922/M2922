@@ -20,6 +20,11 @@ namespace M2922.Core
         private bool _isHost = false;
         [UdonSynced] private string _hostPlayerName = "";
 
+        [Header("=== DAMAGE RECEIVER REGISTRY ===")]
+        private int[] _registeredPlayerIDs = new int[80];
+        private M2922.Component.Health.M2922_DamageReceiver[] _registeredReceivers = new M2922.Component.Health.M2922_DamageReceiver[80];
+        private int _registryCount = 0;
+
         // === METHODE ===
         protected override void Start()
         {
@@ -73,6 +78,42 @@ namespace M2922.Core
         public bool IsHost()
         {
             return _isHost;
+        }
+
+        // ===================================================
+        // DAMAGE RECEIVER REGISTRY
+        // ===================================================
+
+        public void RegisterReceiver(int playerID, M2922.Component.Health.M2922_DamageReceiver receiver)
+        {
+            if (_registryCount >= 80) return;
+            _registeredPlayerIDs[_registryCount] = playerID;
+            _registeredReceivers[_registryCount] = receiver;
+            _registryCount++;
+        }
+
+        public void UnregisterReceiver(int playerID)
+        {
+            for (int i = 0; i < _registryCount; i++)
+            {
+                if (_registeredPlayerIDs[i] == playerID)
+                {
+                    _registryCount--;
+                    _registeredPlayerIDs[i] = _registeredPlayerIDs[_registryCount];
+                    _registeredReceivers[i] = _registeredReceivers[_registryCount];
+                    return;
+                }
+            }
+        }
+
+        public M2922.Component.Health.M2922_DamageReceiver GetReceiverByPlayerID(int playerID)
+        {
+            for (int i = 0; i < _registryCount; i++)
+            {
+                if (_registeredPlayerIDs[i] == playerID)
+                    return _registeredReceivers[i];
+            }
+            return null;
         }
     }
 }

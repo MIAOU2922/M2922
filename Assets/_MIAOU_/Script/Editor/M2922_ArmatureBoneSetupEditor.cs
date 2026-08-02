@@ -7,6 +7,7 @@ namespace M2922.Editor
     /// Custom editor pour M2922_ArmatureBoneSetup : ajoute des boutons dans l'inspecteur.
     /// </summary>
     [CustomEditor(typeof(M2922.Component.Player.M2922_ArmatureBoneSetup))]
+    [CanEditMultipleObjects]
     public class M2922_ArmatureBoneSetupEditor : UnityEditor.Editor
     {
         public override void OnInspectorGUI()

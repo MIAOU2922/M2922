@@ -25,9 +25,23 @@ namespace M2922.Component.Health
         [Header("=== DAMAGE MULTIPLIERS ===")]
         [SerializeField] private float _globalMultiplier = 1f;
 
+        // ===================================================
+        // NETWORK DAMAGE (tireur → cible)
+        // ===================================================
+        [Header("=== NETWORK DAMAGE ===")]
+        [UdonSynced] private float _syncedDamage = 0f;
+        [UdonSynced] private int _syncedDamageType = 0;
+        [UdonSynced] private int _syncedSourceID = -1;
+        [UdonSynced] private bool _hasPendingDamage = false;
+
         protected override void Start()
         {
             base.Start();
+
+            // S'enregistrer auprès du Manager si on est sur un joueur
+            VRCPlayerApi owner = Networking.GetOwner(gameObject);
+            if (owner != null && owner.isLocal && Manager != null)
+                Manager.RegisterReceiver(owner.playerId, this);
         }
 
         protected override void AutoDetectReferences()
@@ -130,6 +144,58 @@ namespace M2922.Component.Health
             string sourceName = source != null ? source.displayName : "world";
             string critStr = isCrit ? " [CRIT]" : "";
             this.Log($"Damage{critStr}: raw={rawDamage:F1}, final={damage:F1}, source={sourceName}");
+        }
+
+        // ===================================================
+        // NETWORK DAMAGE
+        // ===================================================
+
+        /// <summary>
+        /// Appelé par le TIREUR pour transmettre les dégâts en réseau.
+        /// Prend brièvement ownership, écrit les variables synced,
+        /// et la cible les applique dans OnDeserialization().
+        /// </summary>
+        public void SendDamage(float damage, int damageType, VRCPlayerApi source)
+        {
+            // TOUJOURS appliquer localement d'abord
+            ApplyTypedDamage(damage, damageType, source);
+
+            // Puis networker pour les AUTRES clients
+            if (Networking.LocalPlayer == null) return;
+
+            if (!Networking.IsOwner(gameObject))
+                Networking.SetOwner(Networking.LocalPlayer, gameObject);
+
+            _syncedDamage = damage;
+            _syncedDamageType = damageType;
+            _syncedSourceID = source != null ? source.playerId : -1;
+            _hasPendingDamage = true;
+            RequestSerialization();
+        }
+
+        public override void OnDeserialization()
+        {
+            if (_hasPendingDamage)
+            {
+                float dmg = _syncedDamage;
+                int type = _syncedDamageType;
+                int srcID = _syncedSourceID;
+
+                _hasPendingDamage = false;
+                _syncedDamage = 0f;
+
+                // Skip si on est le tireur (déjà appliqué localement)
+                if (Networking.LocalPlayer != null && Networking.LocalPlayer.playerId == srcID)
+                    return;
+
+                // Ré-assert ownership pour que le HealthComponent
+                // puisse sync ses propres HP ensuite
+                if (!Networking.IsOwner(gameObject))
+                    Networking.SetOwner(Networking.LocalPlayer, gameObject);
+
+                VRCPlayerApi source = srcID >= 0 ? VRCPlayerApi.GetPlayerById(srcID) : null;
+                ApplyTypedDamage(dmg, type, source);
+            }
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR

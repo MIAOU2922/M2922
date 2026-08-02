@@ -49,6 +49,9 @@ namespace M2922.Component.Weapon
         [Header("=== BEAM (Trace Rifle) ===")]
         [SerializeField] private LineRenderer _beamRenderer;
         [SerializeField] private float _beamRange = 50f;
+        private float _beamDamageAccum = 0f;
+        private Collider _beamHitTarget = null;
+        private float _beamTimer = 0f;
 
         [Header("=== MELEE ===")]
         [SerializeField] private float _meleeRange = 2f;
@@ -81,6 +84,19 @@ namespace M2922.Component.Weapon
         private bool _useHitscan;
         private bool _useProjectile;
 
+        // --- NETWORK FIRE VFX ---
+        [UdonSynced] private int _fireTick = 0;
+        [UdonSynced] private float _syncedSpreadX = 0f;
+        [UdonSynced] private float _syncedSpreadY = 0f;
+        private int _lastFireTick = -1;
+
+        // --- NETWORK PLAYER DAMAGE RELAY ---
+        [UdonSynced] private int _relayedTargetID = -1;
+        [UdonSynced] private float _relayedDamage = 0f;
+        [UdonSynced] private int _relayedDamageType = 0;
+        [UdonSynced] private int _relaySequence = 0;
+        private int _lastRelaySequence = -1;
+
         // ===================================================
         // LIFECYCLE
         // ===================================================
@@ -93,6 +109,9 @@ namespace M2922.Component.Weapon
 
             if (_weapon == null)
                 _weapon = GetComponent<M2922_Weapon>();
+            // Fallback : chercher dans les enfants (si Weapon sur un child)
+            if (_weapon == null)
+                _weapon = GetComponentInChildren<M2922_Weapon>();
 
             if (_weapon == null)
             {
@@ -135,16 +154,46 @@ namespace M2922.Component.Weapon
         }
 
         // ===================================================
-        // VRChat PICKUP CALLBACKS
+        // VRChat PICKUP CALLBACKS (sur le même GO que VRC Pickup)
         // ===================================================
 
         public override void OnPickup()
         {
-            _isHeld = true;
-            _localPlayer = Networking.LocalPlayer;
+            HandlePickup();
         }
 
         public override void OnDrop()
+        {
+            HandleDrop();
+        }
+
+        public override void OnPickupUseDown()
+        {
+            HandlePickupUseDown();
+        }
+
+        public override void OnPickupUseUp()
+        {
+            HandlePickupUseUp();
+        }
+
+        // ===================================================
+        // PUBLIC RELAY METHODS (appelées par PickupRelay)
+        // ===================================================
+
+        public void HandlePickup()
+        {
+            _isHeld = true;
+            _localPlayer = Networking.LocalPlayer;
+
+            // Transférer ownership du child (WPN_Data) au joueur local.
+            // Le VRC Pickup ne transfère que le parent — l'enfant
+            // doit être transféré manuellement pour que RequestSerialization() marche.
+            if (_localPlayer != null && !Networking.IsOwner(gameObject))
+                Networking.SetOwner(_localPlayer, gameObject);
+        }
+
+        public void HandleDrop()
         {
             _isHeld = false;
             _triggerHeld = false;
@@ -153,13 +202,13 @@ namespace M2922.Component.Weapon
             _beamActive = false;
         }
 
-        public override void OnPickupUseDown()
+        public void HandlePickupUseDown()
         {
             _triggerHeld = true;
             _triggerJustPressed = true;
         }
 
-        public override void OnPickupUseUp()
+        public void HandlePickupUseUp()
         {
             _triggerHeld = false;
             _triggerJustPressed = false;
@@ -197,6 +246,10 @@ namespace M2922.Component.Weapon
 
             if (_fireCooldown > 0f)
                 _fireCooldown -= Time.deltaTime;
+
+            // Beam timer (accumule pour éviter spam réseau)
+            if (_beamTimer > 0f)
+                _beamTimer -= Time.deltaTime;
 
             // Bloom : se résorbe quand on ne tire pas
             if (!_triggerHeld && _bloomAccum > 0f)
@@ -328,7 +381,22 @@ namespace M2922.Component.Weapon
                     {
                         _beamRenderer.SetPosition(1, hit.point);
                         float dps = _weapon.Impact * Time.deltaTime * 10f;
-                        ApplyHitDamage(hit, dps);
+                        // Beam : accumule et envoie toutes les 0.1s pour éviter spam réseau
+                        _beamDamageAccum += dps;
+                        _beamHitTarget = hit.collider;
+                        if (_beamTimer <= 0f)
+                        {
+                            if (_beamDamageAccum > 0f && _beamHitTarget != null)
+                            {
+                                var beamReceiver = _beamHitTarget.GetComponent<M2922_DamageReceiver>();
+                                if (beamReceiver == null)
+                                    beamReceiver = _beamHitTarget.GetComponentInParent<M2922_DamageReceiver>();
+                                if (beamReceiver != null)
+                                    beamReceiver.SendDamage(_beamDamageAccum, _weapon.DamageTypeAsInt, _localPlayer);
+                            }
+                            _beamDamageAccum = 0f;
+                            _beamTimer = 0.1f;
+                        }
                     }
                     else
                     {
@@ -339,6 +407,9 @@ namespace M2922.Component.Weapon
             else
             {
                 _beamActive = false;
+                _beamDamageAccum = 0f;
+                _beamHitTarget = null;
+                _beamTimer = 0f;
                 if (_beamRenderer != null) _beamRenderer.enabled = false;
             }
         }
@@ -354,7 +425,7 @@ namespace M2922.Component.Weapon
                 {
                     var receiver = col.GetComponent<M2922_DamageReceiver>();
                     if (receiver != null)
-                        receiver.ApplyTypedDamage(_weapon.Impact * 2f, _weapon.DamageTypeAsInt, _localPlayer);
+                        receiver.SendDamage(_weapon.Impact * 2f, _weapon.DamageTypeAsInt, _localPlayer);
                 }
             }
         }
@@ -367,16 +438,67 @@ namespace M2922.Component.Weapon
         {
             if (_weapon == null) return;
 
-            _weapon.Fire(); // consomme munition
+            _weapon.Fire(); // consomme munition + son propre RequestSerialization
+
+            // Sync l'event de tir pour les autres joueurs (VFX seulement)
+            _fireTick = _fireTick + 1;
+            _syncedSpreadX = Random.Range(-1f, 1f);
+            _syncedSpreadY = Random.Range(-1f, 1f);
             RequestSerialization();
 
-            // Muzzle flash VFX (toujours, quel que soit le mode)
+            // Muzzle flash VFX (local)
             SpawnMuzzleFlash();
 
             if (_useHitscan)
                 DoHitscan();
             else if (_useProjectile)
                 SpawnProjectile();
+        }
+
+        // ===================================================
+        // NETWORK DESERIALIZATION (VFX pour autres joueurs)
+        // ===================================================
+
+        public override void OnDeserialization()
+        {
+            // --- VFX : muzzle flash pour les autres joueurs ---
+            if (_fireTick != _lastFireTick)
+            {
+                _lastFireTick = _fireTick;
+
+                if (!Networking.IsOwner(gameObject))
+                {
+                    if (_muzzleFlashPrefab != null)
+                    {
+                        Vector3 pos = GetMuzzlePos();
+                        float spreadAngle = GetSpreadAngle();
+                        Quaternion rot = GetMuzzleRot() * Quaternion.Euler(
+                            _syncedSpreadX * spreadAngle,
+                            _syncedSpreadY * spreadAngle,
+                            0f);
+
+                        GameObject flash = Instantiate(_muzzleFlashPrefab);
+                        flash.transform.SetPositionAndRotation(pos, rot);
+                        Destroy(flash, _muzzleFlashLifetime);
+                    }
+                }
+            }
+
+            // --- PLAYER DAMAGE RELAY : la cible applique les dégâts ---
+            if (_relaySequence != _lastRelaySequence)
+            {
+                _lastRelaySequence = _relaySequence;
+
+                int myID = Networking.LocalPlayer != null ? Networking.LocalPlayer.playerId : -1;
+                if (_relayedTargetID == myID)
+                {
+                    var receiver = Manager != null
+                        ? Manager.GetReceiverByPlayerID(myID)
+                        : null;
+                    if (receiver != null)
+                        receiver.ApplyTypedDamage(_relayedDamage, _relayedDamageType, null);
+                }
+            }
         }
 
         // ===================================================
@@ -416,7 +538,6 @@ namespace M2922.Component.Weapon
 
         private void ApplyHitDamage(RaycastHit hit, float damage)
         {
-            // Récupérer le multiplicateur de zone depuis M2922_DamageMultiplier
             float zoneMult = 1f;
             var dmgMult = hit.collider.GetComponent<M2922_DamageMultiplier>();
             if (dmgMult != null)
@@ -424,13 +545,25 @@ namespace M2922.Component.Weapon
 
             float finalDmg = damage * zoneMult;
 
-            // Chercher le DamageReceiver sur la cible
             var receiver = hit.collider.GetComponent<M2922_DamageReceiver>();
             if (receiver == null)
                 receiver = hit.collider.GetComponentInParent<M2922_DamageReceiver>();
 
-            if (receiver != null)
-                receiver.ApplyTypedDamage(finalDmg, _weapon.DamageTypeAsInt, _localPlayer);
+            if (receiver == null) return;
+
+            // Appliquer localement (tireur voit les dégâts)
+            receiver.SendDamage(finalDmg, _weapon.DamageTypeAsInt, _localPlayer);
+
+            // Relai réseau pour les cibles JOUEUR (dont on ne peut pas prendre l'ownership)
+            VRCPlayerApi targetOwner = Networking.GetOwner(receiver.gameObject);
+            if (targetOwner != null && targetOwner != _localPlayer)
+            {
+                _relayedTargetID = targetOwner.playerId;
+                _relayedDamage = finalDmg;
+                _relayedDamageType = _weapon.DamageTypeAsInt;
+                _relaySequence = _relaySequence + 1;
+                RequestSerialization();
+            }
         }
 
         private float ComputeDamage(float distance, float maxRange)

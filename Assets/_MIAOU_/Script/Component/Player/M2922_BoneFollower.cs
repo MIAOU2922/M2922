@@ -10,6 +10,10 @@ namespace M2922.Component.Player
     [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
     public class M2922_BoneFollower : M2922_Base
     {
+        [Header("=== TARGET PLAYER ===")]
+        [Tooltip("Si coché : suit le joueur LOCAL. Décochez pour suivre le OWNER du GameObject (VRC Player Object).")]
+        public bool followLocalPlayer = true;
+
         [Header("=== BONE TRACKING ===")]
         [Tooltip("Os humanoid à suivre sur le joueur local.")]
         public HumanBodyBones trackedBone = HumanBodyBones.Hips;
@@ -28,27 +32,38 @@ namespace M2922.Component.Player
         public Vector3 rotationOffset = Vector3.zero;
 
         // Privé
-        private VRCPlayerApi _localPlayer;
+        private VRCPlayerApi _targetPlayer;
         private bool _isInEditor;
 
         protected override void Start()
         {
             base.Start();
-            _localPlayer = Networking.LocalPlayer;
-            _isInEditor = _localPlayer == null;
+            _isInEditor = Networking.LocalPlayer == null;
+            ResolveTarget();
+        }
+
+        private void ResolveTarget()
+        {
+            if (_isInEditor) return;
+
+            if (followLocalPlayer)
+                _targetPlayer = Networking.LocalPlayer;
+            else
+                _targetPlayer = Networking.GetOwner(gameObject);
         }
 
         public override void PostLateUpdate()
         {
             if (_isInEditor) return;
-            if (_localPlayer == null) return;
+            if (_targetPlayer == null) { ResolveTarget(); return; }
+            if (!_targetPlayer.IsValid()) { ResolveTarget(); return; }
 
             Vector3 targetPos = trackPosition
-                ? _localPlayer.GetBonePosition(trackedBone)
+                ? _targetPlayer.GetBonePosition(trackedBone)
                 : transform.position;
 
             Quaternion targetRot = trackRotation
-                ? _localPlayer.GetBoneRotation(trackedBone)
+                ? _targetPlayer.GetBoneRotation(trackedBone)
                 : transform.rotation;
 
             // Appliquer les offsets

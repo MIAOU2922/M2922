@@ -14,6 +14,7 @@ namespace M2922.Editor
     /// - Auto Gizmo coché → cache les valeurs de config gizmo
     /// </summary>
     [CustomEditor(typeof(M2922.Core.M2922_Base), true)]
+    [CanEditMultipleObjects]
     public class M2922_BaseEditor : UnityEditor.Editor
     {
         // Properties gérées manuellement
