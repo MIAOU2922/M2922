@@ -503,7 +503,7 @@ namespace M2922.Component.Weapon
                     _beamRenderer.SetPosition(0, origin);
                     Vector3 beamEnd;
                     RaycastHit hit;
-                    if (Physics.Raycast(origin, dir, out hit, beamRange, _beamLayerMask))
+                    if (Physics.Raycast(origin, dir, out hit, beamRange, _beamLayerMask, QueryTriggerInteraction.Collide))
                     {
                         beamEnd = hit.point;
                         _beamRenderer.SetPosition(1, beamEnd);
@@ -697,7 +697,7 @@ namespace M2922.Component.Weapon
                 Vector3 dir = GetSpreadDirection(pellets);
 
                 RaycastHit hit;
-                if (Physics.Raycast(origin, dir, out hit, range, _hitscanLayerMask))
+                if (Physics.Raycast(origin, dir, out hit, range, _hitscanLayerMask, QueryTriggerInteraction.Collide))
                 {
                     // Vérifier que c'est bien une hitbox (bon layer)
                     if (hit.collider.gameObject.layer == _hitboxLayer)
