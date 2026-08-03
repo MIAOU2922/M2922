@@ -53,6 +53,14 @@ namespace M2922.Component.Health
             return amount - absorbed;
         }
 
+        /// <summary>Restaure le bouclier au maximum (respawn).</summary>
+        public void Revive()
+        {
+            _currentShield = _maxShield;
+            _lastHitTime = -999f;
+            if (Networking.IsOwner(gameObject)) RequestSerialization();
+        }
+
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
         protected override M2922_GizmoDisplayInfo[] GetGizmoValues()
         {

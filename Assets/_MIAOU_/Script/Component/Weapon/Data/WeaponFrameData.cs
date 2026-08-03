@@ -24,6 +24,10 @@ namespace M2922.Component.Weapon
         [Tooltip("Stats brutes de la frame (les perks/mods/masterwork s'ajoutent par-dessus)")]
         public WeaponBaseStats BaseStats;
 
+        [Header("=== RELOAD ===")]
+        [Tooltip("Style de rechargement par défaut pour cette frame.")]
+        public ReloadStyle ReloadStyle = ReloadStyle.Default;
+
         // ===== HELPERS =====
         public string FullName => $"{FrameName} ({WeaponType})";
 

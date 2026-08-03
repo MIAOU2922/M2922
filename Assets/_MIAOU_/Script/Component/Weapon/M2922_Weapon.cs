@@ -63,6 +63,7 @@ namespace M2922.Component.Weapon
         [SerializeField] private float _bakedFrameBlastRadius;
         [SerializeField] private float _bakedFrameVelocity;
         [SerializeField] private float _bakedFrameAccuracy;
+        [SerializeField] private int _bakedFrameReloadStyle = 0;  // ReloadStyle cast to int
 
         // ===================================================
         // BAKED POOLS : NOMS
@@ -141,6 +142,11 @@ namespace M2922.Component.Weapon
         [UdonSynced] private int _currentAmmo = 0;
         [UdonSynced] private int _ownerPlayerID = -1;
 
+        [Header("=== AMMO ===")]
+        [Tooltip("Munitions infinies (pas de consommation, pas de rechargement).")]
+        [SerializeField] private bool _infiniteAmmo = false;
+        public bool InfiniteAmmo { get { return _infiniteAmmo; } }
+
         [Header("=== DEBUG ===")]
         [SerializeField] private bool _logWeaponStatsOnStart = true;
 
@@ -174,6 +180,7 @@ namespace M2922.Component.Weapon
         public float BakedFrameRange { get { return _bakedFrameRange; } }
         public float BakedFrameStability { get { return _bakedFrameStability; } }
         public float BakedFrameAimAssistance { get { return _bakedFrameAimAssistance; } }
+        public int FrameReloadStyle { get { return _bakedFrameReloadStyle; } }
 
         // Noms des perks/masterwork/mod rollés
         public string RolledPerk1Name { get { return GetPoolName(_bakedPerk1PoolNames, _rolledPerk1Index); } }
@@ -327,21 +334,37 @@ namespace M2922.Component.Weapon
 
         public bool Fire()
         {
-            if (_currentAmmo <= 0)
+            if (!_infiniteAmmo && _currentAmmo <= 0)
             {
                 this.Log("Plus de munitions !");
                 return false;
             }
-            _currentAmmo = _currentAmmo - 1;
-            this.Log("Tir ! Munitions: " + _currentAmmo.ToString() + "/" + _finalMagazine.ToString());
+            if (!_infiniteAmmo)
+                _currentAmmo = _currentAmmo - 1;
+            this.Log("Tir ! Munitions: " + (_infiniteAmmo ? "∞" : _currentAmmo.ToString() + "/" + _finalMagazine.ToString()));
             RequestSerialization();
             return true;
+        }
+
+        public bool NeedsReload()
+        {
+            return !_infiniteAmmo && _currentAmmo <= 0;
         }
 
         public void Reload()
         {
             _currentAmmo = _finalMagazine;
             this.Log("Rechargement termine.");
+            RequestSerialization();
+        }
+
+        /// <summary>
+        /// Ajoute UNE balle dans le chargeur (rechargement séquentiel).
+        /// </summary>
+        public void ReloadOne()
+        {
+            if (_currentAmmo < _finalMagazine)
+                _currentAmmo = _currentAmmo + 1;
             RequestSerialization();
         }
 
@@ -425,6 +448,7 @@ namespace M2922.Component.Weapon
                 _bakedFrameBlastRadius = fs.BlastRadius;
                 _bakedFrameVelocity = fs.Velocity;
                 _bakedFrameAccuracy = fs.Accuracy;
+                _bakedFrameReloadStyle = (int)def.Frame.ReloadStyle;
             }
 
             // Bake perk pools
@@ -591,6 +615,7 @@ namespace M2922.Component.Weapon
             _bakedFrameZoom = 0f; _bakedFrameAirborneEffectiveness = 0f; _bakedFrameRecoilDirection = 0f;
             _bakedFrameRPM = 0f; _bakedFrameChargeTime = 0f; _bakedFrameDrawTime = 0f;
             _bakedFrameMagazine = 0; _bakedFrameBlastRadius = 0f; _bakedFrameVelocity = 0f; _bakedFrameAccuracy = 0f;
+            _bakedFrameReloadStyle = 0;
 
             _bakedPerk1PoolNames = new string[0]; _bakedPerk1PoolStats = new float[0];
             _bakedPerk2PoolNames = new string[0]; _bakedPerk2PoolStats = new float[0];

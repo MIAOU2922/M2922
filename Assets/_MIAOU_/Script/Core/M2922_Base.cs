@@ -37,6 +37,7 @@ namespace M2922.Core
         [SerializeField] private float _gizmoValueScale = 10f;
         [SerializeField] private Color _gizmoHeaderColor = new Color(0f, 1f, 0.8f);
         [SerializeField] private bool _gizmoOnlyWhenSelected = false;
+        [HideInInspector] [SerializeField] private bool __gizmoColorInitialized = false;
 
         /// <summary>
         /// Surchargez pour auto-détecter les références (GetComponent) sur ce GameObject.
@@ -55,6 +56,20 @@ namespace M2922.Core
         }
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
 
+        /// <summary>
+        /// Génère une couleur stable et distincte à partir d'un nom (hash du nom de classe).
+        /// </summary>
+        private static Color GetStableColor(string name)
+        {
+            int hash = name.GetHashCode();
+            // Générer une teinte (H) bien répartie sur 0-1
+            float h = ((hash & 0xFFFF) / 65535f);
+            // Saturation et valeur élevées pour des couleurs vives et lisibles
+            float s = 0.7f + ((hash >> 16) & 0xFF) / 255f * 0.3f;  // 0.7 - 1.0
+            float v = 0.75f + ((hash >> 24) & 0xFF) / 255f * 0.25f; // 0.75 - 1.0
+            return Color.HSVToRGB(h, s, v);
+        }
+
         // validation dans l'editeur
         protected virtual void OnValidate()
         {
@@ -62,6 +77,14 @@ namespace M2922.Core
                 _ScriptName = this.GetType().Name;
             else if (string.IsNullOrEmpty(_ScriptName))
                 _ScriptName = this.GetType().Name;
+
+            // Auto-assigner une couleur de gizmo unique basée sur le nom de la classe
+            if (!__gizmoColorInitialized)
+            {
+                _gizmoHeaderColor = GetStableColor(this.GetType().Name);
+                __gizmoColorInitialized = true;
+            }
+
             if (Manager == null) TryFindManager();
             SetDebugFlags();
             AutoDetectReferences();

@@ -85,6 +85,13 @@ namespace M2922.Component.Weapon.Editor
                 EditorGUILayout.LabelField("AA", FV("_bakedFrameAimAssistance").ToString("F1"));
                 EditorGUILayout.LabelField("RecoilDir", FV("_bakedFrameRecoilDirection").ToString("F1"));
                 EditorGUILayout.LabelField("Airborne", FV("_bakedFrameAirborneEffectiveness").ToString("F1"));
+                EditorGUILayout.LabelField("Reload Style", ((ReloadStyle)IV("_bakedFrameReloadStyle")).ToString());
+
+                // ---- AMMO SETTINGS (editable) ----
+                EditorGUILayout.Space();
+                SerializedProperty infiniteAmmoProp = _so.FindProperty("_infiniteAmmo");
+                if (infiniteAmmoProp != null)
+                    EditorGUILayout.PropertyField(infiniteAmmoProp, new GUIContent("Infinite Ammo"));
 
                 // ---- PREVIEW SELECTION ----
                 EditorGUILayout.Space();
@@ -163,6 +170,7 @@ namespace M2922.Component.Weapon.Editor
                 SetF("_bakedFrameBlastRadius", fs.BlastRadius);
                 SetF("_bakedFrameVelocity", fs.Velocity);
                 SetF("_bakedFrameAccuracy", fs.Accuracy);
+                SetI("_bakedFrameReloadStyle", (int)def.Frame.ReloadStyle);
             }
 
             BakePerkPool(def.PerkColumn1Pool, "_bakedPerk1PoolNames", "_bakedPerk1PoolStats", S);

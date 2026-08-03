@@ -224,6 +224,89 @@ namespace M2922.Component.Weapon
                 default: return 100f;
             }
         }
+
+        /// <summary>
+        /// Temps de rechargement de base (secondes) selon le type d'arme.
+        /// </summary>
+        public static float GetBaseReloadTime(WeaponType type)
+        {
+            switch (type)
+            {
+                case WeaponType.Sidearm:             return 1.6f;
+                case WeaponType.SubmachineGun:       return 2.0f;
+                case WeaponType.AutoRifle:           return 2.5f;
+                case WeaponType.PulseRifle:          return 2.4f;
+                case WeaponType.HandCannon:          return 2.6f;
+                case WeaponType.ScoutRifle:          return 2.7f;
+                case WeaponType.Shotgun:             return 3.0f;
+                case WeaponType.SniperRifle:         return 3.2f;
+                case WeaponType.LinearFusionRifle:   return 3.3f;
+                case WeaponType.MachineGun:          return 5.0f;
+                case WeaponType.FusionRifle:         return 2.8f;
+                case WeaponType.CombatBow:           return 2.3f;
+                case WeaponType.TraceRifle:          return 3.0f;
+                case WeaponType.RocketLauncher:
+                case WeaponType.BreechLoadedGrenadeLauncher:
+                case WeaponType.HeavyGrenadeLauncher: return 3.5f;
+                case WeaponType.RocketSidearm:       return 3.5f;
+                case WeaponType.Sword:               return 2.0f;
+                case WeaponType.Glaive:              return 2.0f;
+                default: return 2.5f;
+            }
+        }
+
+        /// <summary>
+        /// True si l'arme utilise un rechargement balle par balle (Shotgun, etc.).
+        /// </summary>
+        public static bool IsSequentialReload(WeaponType type)
+        {
+            // Types qui sont généralement balle par balle
+            switch (type)
+            {
+                case WeaponType.Shotgun:
+                case WeaponType.BreechLoadedGrenadeLauncher:
+                    return true;
+                // HandCannon, ScoutRifle : peuvent être les deux selon l'arme
+                // → le ReloadStyle dans le FireHandler permet l'override
+                default: return false;
+            }
+        }
+
+        /// <summary>
+        /// Temps de base (secondes) pour chaque phase du rechargement séquentiel,
+        /// à stat ReloadSpeed = 0.
+        /// </summary>
+        public static void GetSequentialReloadTimes(WeaponType type, out float startTime, out float perShellTime, out float endTime)
+        {
+            switch (type)
+            {
+                case WeaponType.Shotgun:
+                    startTime = 0.5f;
+                    perShellTime = 0.55f;
+                    endTime = 0.4f;
+                    break;
+                case WeaponType.BreechLoadedGrenadeLauncher:
+                    startTime = 0.6f;
+                    perShellTime = 0.7f;
+                    endTime = 0.5f;
+                    break;
+                case WeaponType.HandCannon:   // Revolver
+                    startTime = 0.5f;
+                    perShellTime = 0.45f;
+                    endTime = 0.5f;
+                    break;
+                case WeaponType.ScoutRifle:
+                    startTime = 0.4f;
+                    perShellTime = 0.5f;
+                    endTime = 0.4f;
+                    break;
+                default:
+                    startTime = 0.4f;
+                    perShellTime = 0.5f;
+                    endTime = 0.4f;
+                    break;
+            }
+        }
     }
 
     /// <summary>

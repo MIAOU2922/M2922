@@ -8,6 +8,27 @@ using M2922.Component.Health;
 namespace M2922.Component.Weapon
 {
     /// <summary>
+    /// Phases du rechargement séquentiel (shotgun).
+    /// </summary>
+    public enum ReloadPhase
+    {
+        None,
+        Start,  // Ouverture de l'arme
+        Loop,   // Insertion balle par balle
+        End     // Fermeture de l'arme
+    }
+
+    /// <summary>
+    /// Style de rechargement configurable par arme.
+    /// </summary>
+    public enum ReloadStyle
+    {
+        Default,    // Déterminé par le type d'arme
+        Magazine,   // Chargeur complet
+        Sequential  // Balle par balle (Shotgun, Revolver, GL, Scout, etc.)
+    }
+
+    /// <summary>
     /// Gère la logique de tir : hitscan (raycast) pour les armes à balle,
     /// projectiles physiques pour les lanceurs (roquette, grenade).
     /// 
@@ -48,10 +69,15 @@ namespace M2922.Component.Weapon
 
         [Header("=== BEAM (Trace Rifle) ===")]
         [SerializeField] private LineRenderer _beamRenderer;
-        [SerializeField] private float _beamRange = 50f;
+        [Tooltip("Layers que le beam traverse/détecte (hitbox + environment).")]
+        [SerializeField] private LayerMask _beamLayerMask = ~0;
         private float _beamDamageAccum = 0f;
         private Collider _beamHitTarget = null;
         private float _beamTimer = 0f;
+
+        [Header("=== RELOAD ===")]
+        [Tooltip("Rechargement automatique quand le chargeur est vide.")]
+        [SerializeField] private bool _autoReload = true;
 
         [Header("=== MELEE ===")]
         [SerializeField] private float _meleeRange = 2f;
@@ -76,6 +102,12 @@ namespace M2922.Component.Weapon
         private float _bloomDecay = 2f;        // -2/sec à l'arrêt
         private float _bloomMaxMult = 5f;      // cap du multiplicateur (x5 max)
 
+        // --- RELOAD STATE ---
+        private bool _isReloading = false;
+        private float _reloadTimer = 0f;
+        private ReloadPhase _reloadPhase = ReloadPhase.None;
+        private bool _isSequentialReload = false;
+
         // --- OWNERSHIP ---
         private VRCPlayerApi _localPlayer;
         private bool _isHeld = false;
@@ -89,6 +121,11 @@ namespace M2922.Component.Weapon
         [UdonSynced] private float _syncedSpreadX = 0f;
         [UdonSynced] private float _syncedSpreadY = 0f;
         private int _lastFireTick = -1;
+
+        // --- NETWORK BEAM (Trace Rifle) ---
+        [UdonSynced] private bool _syncedBeamActive = false;
+        [UdonSynced] private float _syncedBeamStartX, _syncedBeamStartY, _syncedBeamStartZ;
+        [UdonSynced] private float _syncedBeamEndX, _syncedBeamEndY, _syncedBeamEndZ;
 
         // --- NETWORK PLAYER DAMAGE RELAY ---
         [UdonSynced] private int _relayedTargetID = -1;
@@ -132,7 +169,10 @@ namespace M2922.Component.Weapon
                 InitProjectilePool();
 
             if (_beamRenderer != null)
+            {
+                _beamRenderer.positionCount = 2;
                 _beamRenderer.enabled = false;
+            }
 
             this.Log("FireHandler pret. Mode=" + _fireMode.ToString()
                 + " RPM=" + rpm.ToString()
@@ -259,6 +299,90 @@ namespace M2922.Component.Weapon
                 UpdateSpreadMult();
             }
 
+            // Reload state machine
+            if (_isReloading)
+            {
+                _reloadTimer -= Time.deltaTime;
+
+                switch (_reloadPhase)
+                {
+                    case ReloadPhase.Start:
+                        // Phase Start : attendre la fin, puis passer à Loop (séquentiel) ou fin (mag)
+                        if (_reloadTimer <= 0f)
+                        {
+                            if (_isSequentialReload)
+                            {
+                                // Insérer la première balle
+                                InsertOneShell();
+                                if (_weapon.CurrentAmmo >= _weapon.Magazine)
+                                {
+                                    // Déjà plein ? Passer à End
+                                    BeginReloadEnd();
+                                }
+                                else
+                                {
+                                    _reloadPhase = ReloadPhase.Loop;
+                                    _reloadTimer = GetShellDuration();
+                                }
+                            }
+                            else
+                            {
+                                // Rechargement mag : terminé
+                                FinishReload();
+                            }
+                        }
+                        break;
+
+                    case ReloadPhase.Loop:
+                        // Insérer une balle par tick
+                        if (_reloadTimer <= 0f)
+                        {
+                            InsertOneShell();
+                            if (_weapon.CurrentAmmo >= _weapon.Magazine)
+                            {
+                                BeginReloadEnd();
+                            }
+                            else
+                            {
+                                _reloadTimer = GetShellDuration();
+                            }
+                        }
+                        break;
+
+                    case ReloadPhase.End:
+                        if (_reloadTimer <= 0f)
+                        {
+                            FinishReload();
+                        }
+                        break;
+                }
+
+                // Pendant le reload, on bloque le tir (sauf si le joueur tire pour interrompre)
+                if (_triggerJustPressed && _isSequentialReload && _reloadPhase == ReloadPhase.Loop)
+                {
+                    // Interruption : on passe directement à la phase End
+                    BeginReloadEnd();
+                }
+                _triggerJustPressed = false;
+                return;
+            }
+
+            // Auto-reload quand vide
+            if (_autoReload && _weapon != null && _weapon.NeedsReload() && !_isReloading)
+            {
+                ReloadWeapon();
+                _triggerJustPressed = false;
+                return;
+            }
+
+#if UNITY_EDITOR
+            // Rechargement manuel avec la touche E (éditeur uniquement)
+            if (Input.GetKeyDown(KeyCode.E) && !_isReloading)
+            {
+                ReloadWeapon();
+            }
+#endif
+
             switch (_fireMode)
             {
                 case FireMode.FullAuto:   UpdateFullAuto(); break;
@@ -369,39 +493,61 @@ namespace M2922.Component.Weapon
             if (_triggerHeld)
             {
                 _beamActive = true;
-                if (_beamRenderer != null)
+                if (_beamRenderer != null && _beamRenderer.positionCount >= 2)
                 {
                     _beamRenderer.enabled = true;
                     Vector3 origin = GetMuzzlePos();
                     Vector3 dir = GetMuzzleDir();
+                    float beamRange = GetEffectiveBeamRange();
 
                     _beamRenderer.SetPosition(0, origin);
+                    Vector3 beamEnd;
                     RaycastHit hit;
-                    if (Physics.Raycast(origin, dir, out hit, _beamRange, _hitscanLayerMask))
+                    if (Physics.Raycast(origin, dir, out hit, beamRange, _beamLayerMask))
                     {
-                        _beamRenderer.SetPosition(1, hit.point);
-                        float dps = _weapon.Impact * Time.deltaTime * 10f;
-                        // Beam : accumule et envoie toutes les 0.1s pour éviter spam réseau
-                        _beamDamageAccum += dps;
-                        _beamHitTarget = hit.collider;
-                        if (_beamTimer <= 0f)
+                        beamEnd = hit.point;
+                        _beamRenderer.SetPosition(1, beamEnd);
+
+                        if (hit.collider.gameObject.layer == _hitboxLayer)
                         {
-                            if (_beamDamageAccum > 0f && _beamHitTarget != null)
+                            float dps = _weapon.Impact * Time.deltaTime * 10f;
+                            _beamDamageAccum += dps;
+                            _beamHitTarget = hit.collider;
+                            if (_beamTimer <= 0f)
                             {
-                                var beamReceiver = _beamHitTarget.GetComponent<M2922_DamageReceiver>();
-                                if (beamReceiver == null)
-                                    beamReceiver = _beamHitTarget.GetComponentInParent<M2922_DamageReceiver>();
-                                if (beamReceiver != null)
-                                    beamReceiver.SendDamage(_beamDamageAccum, _weapon.DamageTypeAsInt, _localPlayer);
+                                if (_beamDamageAccum > 0f && _beamHitTarget != null)
+                                {
+                                    var beamReceiver = _beamHitTarget.GetComponent<M2922_DamageReceiver>();
+                                    if (beamReceiver == null)
+                                        beamReceiver = _beamHitTarget.GetComponentInParent<M2922_DamageReceiver>();
+                                    if (beamReceiver != null)
+                                    {
+                                        beamReceiver.SendDamage(_beamDamageAccum, _weapon.DamageTypeAsInt, _localPlayer);
+
+                                        VRCPlayerApi targetOwner = Networking.GetOwner(beamReceiver.gameObject);
+                                        if (targetOwner != null && targetOwner != _localPlayer)
+                                        {
+                                            _relayedTargetID = targetOwner.playerId;
+                                            _relayedDamage = _beamDamageAccum;
+                                            _relayedDamageType = _weapon.DamageTypeAsInt;
+                                            _relaySequence = _relaySequence + 1;
+                                            RequestSerialization();
+                                        }
+                                    }
+                                }
+                                _beamDamageAccum = 0f;
+                                _beamTimer = 0.1f;
                             }
-                            _beamDamageAccum = 0f;
-                            _beamTimer = 0.1f;
                         }
                     }
                     else
                     {
-                        _beamRenderer.SetPosition(1, origin + dir * _beamRange);
+                        beamEnd = origin + dir * beamRange;
+                        _beamRenderer.SetPosition(1, beamEnd);
                     }
+
+                    // Sync beam visuel pour les autres joueurs
+                    SyncBeam(origin, beamEnd);
                 }
             }
             else
@@ -411,7 +557,23 @@ namespace M2922.Component.Weapon
                 _beamHitTarget = null;
                 _beamTimer = 0f;
                 if (_beamRenderer != null) _beamRenderer.enabled = false;
+
+                // Sync beam off
+                _syncedBeamActive = false;
+                RequestSerialization();
             }
+        }
+
+        private void SyncBeam(Vector3 start, Vector3 end)
+        {
+            _syncedBeamActive = true;
+            _syncedBeamStartX = start.x;
+            _syncedBeamStartY = start.y;
+            _syncedBeamStartZ = start.z;
+            _syncedBeamEndX = end.x;
+            _syncedBeamEndY = end.y;
+            _syncedBeamEndZ = end.z;
+            RequestSerialization();
         }
 
         private void UpdateMelee()
@@ -453,6 +615,10 @@ namespace M2922.Component.Weapon
                 DoHitscan();
             else if (_useProjectile)
                 SpawnProjectile();
+
+            // Auto-reload si vide après le tir
+            if (_autoReload && _weapon.NeedsReload())
+                ReloadWeapon();
         }
 
         // ===================================================
@@ -497,6 +663,21 @@ namespace M2922.Component.Weapon
                         : null;
                     if (receiver != null)
                         receiver.ApplyTypedDamage(_relayedDamage, _relayedDamageType, null);
+                }
+            }
+
+            // --- BEAM REMOTE RENDERING : les autres joueurs voient le beam ---
+            if (!Networking.IsOwner(gameObject) && _beamRenderer != null && _beamRenderer.positionCount >= 2)
+            {
+                if (_syncedBeamActive)
+                {
+                    _beamRenderer.enabled = true;
+                    _beamRenderer.SetPosition(0, new Vector3(_syncedBeamStartX, _syncedBeamStartY, _syncedBeamStartZ));
+                    _beamRenderer.SetPosition(1, new Vector3(_syncedBeamEndX, _syncedBeamEndY, _syncedBeamEndZ));
+                }
+                else
+                {
+                    _beamRenderer.enabled = false;
                 }
             }
         }
@@ -584,8 +765,14 @@ namespace M2922.Component.Weapon
         private float GetEffectiveRange()
         {
             float baseRange = FireModeMapping.GetHitscanRange(_weaponType);
-            // Le Range stat et le Zoom étendent la portée (coefficients Open World)
             return baseRange + (_weapon.Range * 0.8f) + (_weapon.Zoom * 1.2f);
+        }
+
+        /// <summary>Portée du beam basée sur la stat Range de l'arme.</summary>
+        private float GetEffectiveBeamRange()
+        {
+            float baseRange = FireModeMapping.GetHitscanRange(_weaponType);
+            return baseRange + (_weapon.Range * 1.5f) + (_weapon.Zoom * 1.5f);
         }
 
         private Vector3 GetSpreadDirection(int pellets)
@@ -667,8 +854,9 @@ namespace M2922.Component.Weapon
 
         private bool CanFire()
         {
+            if (_isReloading) return false;
             if (_fireMode == FireMode.SingleShot) return true;
-            return _weapon.CurrentAmmo > 0;
+            return _weapon.CurrentAmmo > 0 || _weapon.InfiniteAmmo;
         }
 
         private Vector3 GetMuzzlePos()
@@ -736,14 +924,192 @@ namespace M2922.Component.Weapon
             }
         }
 
+        /// <summary>
+        /// Calcule la durée de rechargement mag (non-séquentiel).
+        /// </summary>
+        private float CalculateReloadDuration()
+        {
+            if (_weapon == null) return 2.5f;
+
+            float baseTime = FireModeMapping.GetBaseReloadTime(_weaponType);
+            float reloadStat = Mathf.Clamp(_weapon.ReloadSpeed, 0f, 100f);
+            float reduction = (reloadStat * 0.5f) / 100f;
+            float reloadTime = baseTime * (1f - reduction);
+
+            // Tactical reload : 10% plus rapide si chargeur pas complètement vide
+            if (_weapon.CurrentAmmo > 0)
+                reloadTime *= 0.9f;
+
+            return reloadTime;
+        }
+
+        /// <summary>
+        /// Calcule la durée d'une phase de rechargement séquentiel.
+        /// speedMultiplier = 1.0 + reloadStat/100  (1x à stat 0, 2x à stat 100)
+        /// </summary>
+        private float GetSequentialPhaseDuration(float baseDuration)
+        {
+            float reloadStat = Mathf.Clamp(_weapon != null ? _weapon.ReloadSpeed : 50f, 0f, 100f);
+            float speedMultiplier = 1f + (reloadStat / 100f);
+            return baseDuration / speedMultiplier;
+        }
+
+        private float GetShellDuration()
+        {
+            float ignoreStart, perShell, ignoreEnd;
+            FireModeMapping.GetSequentialReloadTimes(_weaponType, out ignoreStart, out perShell, out ignoreEnd);
+            return GetSequentialPhaseDuration(perShell);
+        }
+
+        /// <summary>Insère une balle dans le chargeur (rechargement séquentiel).</summary>
+        private void InsertOneShell()
+        {
+            if (_weapon == null) return;
+            _weapon.ReloadOne();
+            this.Log("Reload +1 balle (" + _weapon.CurrentAmmo.ToString() + "/" + _weapon.Magazine.ToString() + ")");
+        }
+
+        /// <summary>Passe à la phase End du rechargement séquentiel.</summary>
+        private void BeginReloadEnd()
+        {
+            _reloadPhase = ReloadPhase.End;
+            float ignS, ignP, baseEnd;
+            FireModeMapping.GetSequentialReloadTimes(_weaponType, out ignS, out ignP, out baseEnd);
+            _reloadTimer = GetSequentialPhaseDuration(baseEnd);
+        }
+
+        /// <summary>Termine le rechargement (mag ou séquentiel).</summary>
+        private void FinishReload()
+        {
+            _isReloading = false;
+            _reloadPhase = ReloadPhase.None;
+            _isSequentialReload = false;
+            if (_weapon != null) _weapon.Reload(); // Remplit le chargeur au max
+            this.Log("Rechargement termine.");
+        }
+
         public void ForceReload()
         {
-            if (_weapon != null) _weapon.Reload();
+            ReloadWeapon();
+        }
+
+        /// <summary>
+        /// Démarre le rechargement (mag complet ou séquentiel selon le type d'arme).
+        /// </summary>
+        public void ReloadWeapon()
+        {
+            if (_weapon == null) return;
+            if (_weapon.InfiniteAmmo) return;
+            if (_isReloading) return;
+            if (_weapon.CurrentAmmo >= _weapon.Magazine) return;
+
+            _isReloading = true;
+            _isSequentialReload = IsSequential();
+
+            if (_isSequentialReload)
+            {
+                // Rechargement balle par balle : phase Start
+                _reloadPhase = ReloadPhase.Start;
+                float baseStart, ignP, ignE;
+                FireModeMapping.GetSequentialReloadTimes(_weaponType, out baseStart, out ignP, out ignE);
+                _reloadTimer = GetSequentialPhaseDuration(baseStart);
+                this.Log("Rechargement seq. START (" + _reloadTimer.ToString("F1") + "s)");
+            }
+            else
+            {
+                // Rechargement mag classique
+                _reloadPhase = ReloadPhase.Start;
+                _reloadTimer = CalculateReloadDuration();
+                this.Log("Rechargement mag (" + _reloadTimer.ToString("F1") + "s)");
+            }
         }
 
         public bool IsFiring()
         {
             return _triggerHeld || _burstRemaining > 0 || _isCharging || _beamActive;
+        }
+
+        public bool IsReloading()
+        {
+            return _isReloading;
+        }
+
+        /// <summary>
+        /// True si l'arme utilise le rechargement séquentiel (balle par balle).
+        /// </summary>
+        public bool IsSequentialReload()
+        {
+            return _isSequentialReload;
+        }
+
+        /// <summary>
+        /// Résout le style de rechargement effectif :
+        /// Priorité : Frame → type mapping. La frame peut override le défaut du type.
+        /// </summary>
+        private bool IsSequential()
+        {
+            if (_weapon == null) return false;
+            int frameStyle = _weapon.FrameReloadStyle;
+            if (frameStyle == (int)ReloadStyle.Sequential) return true;
+            if (frameStyle == (int)ReloadStyle.Magazine) return false;
+            // Default : suivre le mapping par type
+            return FireModeMapping.IsSequentialReload(_weaponType);
+        }
+
+        /// <summary>
+        /// Appelé par le MagazineWell : insère une balle (séquentiel)
+        /// ou lance un rechargement complet (mag).
+        /// </summary>
+        public void TryInsertShellOrReload()
+        {
+            if (_weapon == null) return;
+            if (_weapon.InfiniteAmmo) return;
+            if (_weapon.CurrentAmmo >= _weapon.Magazine) return;
+
+            bool sequential = IsSequential();
+
+            if (sequential)
+            {
+                if (_isReloading && _reloadPhase == ReloadPhase.Loop)
+                {
+                    // Déjà en train de recharger en boucle : insérer une balle maintenant
+                    InsertOneShell();
+                    _reloadTimer = GetShellDuration(); // reset timer
+                    if (_weapon.CurrentAmmo >= _weapon.Magazine)
+                        BeginReloadEnd();
+                }
+                else if (!_isReloading)
+                {
+                    // Démarrer un rechargement séquentiel
+                    ReloadWeapon();
+                }
+                // Si en phase Start ou End, on ignore (laisser l'animation se finir)
+            }
+            else
+            {
+                // Rechargement mag classique
+                ReloadWeapon();
+            }
+        }
+
+        public float ReloadProgress()
+        {
+            if (!_isReloading) return 0f;
+
+            if (_isSequentialReload)
+            {
+                // Progress basé sur le nombre de balles insérées vs balles manquantes
+                int needed = _weapon.Magazine - _weapon.CurrentAmmo;
+                int totalMissing = _weapon.Magazine; // approximation
+                if (totalMissing <= 0) return 1f;
+                float shellProgress = 1f - ((float)needed / (float)totalMissing);
+                return Mathf.Clamp01(shellProgress);
+            }
+            else
+            {
+                float total = CalculateReloadDuration();
+                return total > 0f ? 1f - (_reloadTimer / total) : 1f;
+            }
         }
 
         /// <summary>
@@ -784,9 +1150,13 @@ namespace M2922.Component.Weapon
             _hitboxLayer = UnityEngine.LayerMask.NameToLayer(_hitboxLayerName);
             if (_hitboxLayer < 0) _hitboxLayer = 8;
 
-            // Auto-set le layerMask pour ne cibler que ce layer
+            // Auto-set le layerMask pour le hitscan (hitbox uniquement)
             if (_hitboxLayer >= 0)
                 _hitscanLayerMask = (1 << _hitboxLayer);
+
+            // Beam layer mask : hitbox + Default (murs, environnement)
+            int defaultLayer = 0; // Layer 0 = Default
+            _beamLayerMask = (1 << _hitboxLayer) | (1 << defaultLayer);
 
             // Propager le layer au prefab projectile
             if (_projectilePrefab != null)

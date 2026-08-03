@@ -1,12 +1,22 @@
 using UdonSharp;
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 using VRC.SDKBase;
 using M2922.Core;
 using M2922.Component.Health;
 
 namespace M2922.Component.UI
 {
+    /// <summary>
+    /// Mode d'affichage des valeurs HP/Shield dans le TMP.
+    /// </summary>
+    public enum HPDisplayMode
+    {
+        Raw,     // "75"
+        Percent  // "75%"
+    }
+
     /// <summary>
     /// Barre de vie UI : met à jour le m_FillAmount des Images
     /// "Life" et "shield" en fonction du HealthComponent / ShieldComponent.
@@ -34,6 +44,28 @@ namespace M2922.Component.UI
         [SerializeField] private Image _lifeFill;
         [Tooltip("Image 'shield' (barre de bouclier, bleu).")]
         [SerializeField] private Image _shieldFill;
+
+        [Header("=== TEXTS (TMP) ===")]
+        [Tooltip("Texte pour le nom du joueur / entité (manuel uniquement).")]
+        [SerializeField] private TextMeshProUGUI _nameText;
+        [Tooltip("Nom affiché dans le TMP Name.")]
+        [SerializeField] private string _displayName = "";
+        [Tooltip("Récupère automatiquement le displayName du joueur local VRChat.")]
+        [SerializeField] private bool _autoDetectPlayerName = false;
+        [Tooltip("Texte pour les HP (valeur ou %).")]
+        [SerializeField] private TextMeshProUGUI _hpText;
+        [Tooltip("Texte pour le Shield (valeur ou %).")]
+        [SerializeField] private TextMeshProUGUI _shieldText;
+
+        [Header("=== DISPLAY MODE ===")]
+        [Tooltip("Préfixe ajouté devant la valeur HP (ex: 'HP ').")]
+        [SerializeField] private string _hpPrefix = "";
+        [Tooltip("Préfixe ajouté devant la valeur Shield (ex: 'SH ').")]
+        [SerializeField] private string _shieldPrefix = "";
+        [Tooltip("Mode d'affichage des HP : Raw = '75', Percent = '75%'.")]
+        [SerializeField] private HPDisplayMode _hpDisplayMode = HPDisplayMode.Raw;
+        [Tooltip("Mode d'affichage du Shield : Raw = '30', Percent = '60%'.")]
+        [SerializeField] private HPDisplayMode _shieldDisplayMode = HPDisplayMode.Raw;
 
         [Header("=== SMOOTHING ===")]
         [Tooltip("Vitesse d'animation de la barre (0 = instantané).")]
@@ -92,6 +124,9 @@ namespace M2922.Component.UI
 
             if (_shieldFill != null)
                 _shieldFill.fillAmount = _displayedShield;
+
+            // Mettre à jour les textes TMP
+            RefreshTexts();
         }
 
         // ============================================================
@@ -152,6 +187,23 @@ namespace M2922.Component.UI
                     _shieldFill = shieldTr.GetComponent<Image>();
             }
 
+            // --- Auto-détection des TMP par nom ---
+            if (_hpText == null)
+            {
+                Transform hpTr = transform.Find("HP");
+                if (hpTr != null)
+                    _hpText = hpTr.GetComponent<TextMeshProUGUI>();
+            }
+            if (_shieldText == null)
+            {
+                Transform shTr = transform.Find("Shield");
+                if (shTr != null)
+                    _shieldText = shTr.GetComponent<TextMeshProUGUI>();
+            }
+
+            // Appliquer le nom manuel
+            ApplyName();
+
             // Initialiser les valeurs affichées
             if (_health != null)
                 _displayedHP = _health.HPPercentage;
@@ -159,6 +211,8 @@ namespace M2922.Component.UI
                 _displayedShield = _shield.MaxShield > 0f
                     ? _shield.CurrentShield / _shield.MaxShield
                     : 0f;
+
+            RefreshTexts();
 
             this.Log($"[HealthBarUI] HP={_displayedHP:P0} Shield={_displayedShield:P0}");
         }
@@ -184,6 +238,60 @@ namespace M2922.Component.UI
                     : 0f;
                 _shieldFill.fillAmount = _displayedShield;
             }
+            RefreshTexts();
+        }
+
+        // ============================================================
+        // HELPERS
+        // ============================================================
+
+        /// <summary>Applique le nom au TMP Name (manuel ou auto-détecté).</summary>
+        private void ApplyName()
+        {
+            if (_nameText == null) return;
+
+            if (_autoDetectPlayerName)
+            {
+                if (_autoDetectLocalPlayer && Networking.LocalPlayer != null)
+                {
+                    _nameText.text = Networking.LocalPlayer.displayName;
+                }
+                else if (_damageReceiver != null)
+                {
+                    VRCPlayerApi owner = Networking.GetOwner(_damageReceiver.gameObject);
+                    _nameText.text = owner != null ? owner.displayName : _displayName;
+                }
+                else
+                {
+                    _nameText.text = _displayName;
+                }
+            }
+            else
+            {
+                _nameText.text = _displayName;
+            }
+        }
+
+        /// <summary>Met à jour tous les textes TMP.</summary>
+        private void RefreshTexts()
+        {
+            if (_hpText != null && _health != null)
+            {
+                float hpMax = _health.MaxHP;
+                float hpCur = _health.CurrentHP;
+                _hpText.text = _hpDisplayMode == HPDisplayMode.Raw
+                    ? $"{_hpPrefix}{hpCur:F0}"
+                    : $"{_hpPrefix}{(hpMax > 0f ? hpCur / hpMax * 100f : 0f):F0}%";
+            }
+
+            if (_shieldText != null && _shield != null)
+            {
+                float shMax = _shield.MaxShield;
+                float shCur = _shield.CurrentShield;
+                _shieldText.text = _shieldDisplayMode == HPDisplayMode.Raw
+                    ? $"{_shieldPrefix}{shCur:F0}"
+                    : $"{_shieldPrefix}{(shMax > 0f ? shCur / shMax * 100f : 0f):F0}%";
+            }
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
@@ -201,6 +309,9 @@ namespace M2922.Component.UI
                 new M2922_GizmoDisplayInfo("Shield", _shield != null ? $"{_shield.CurrentShield:F0}/{_shield.MaxShield:F0}" : "N/A"),
                 new M2922_GizmoDisplayInfo("Life Fill", _lifeFill != null ? $"{_lifeFill.fillAmount:P0}" : "MISSING"),
                 new M2922_GizmoDisplayInfo("Shield Fill", _shieldFill != null ? $"{_shieldFill.fillAmount:P0}" : "MISSING"),
+                new M2922_GizmoDisplayInfo("TMP Name", _nameText != null ? _displayName : "MISSING"),
+                new M2922_GizmoDisplayInfo("TMP HP", _hpText != null ? $"{_hpPrefix}{_health?.CurrentHP ?? 0:F0}" : "MISSING"),
+                new M2922_GizmoDisplayInfo("TMP Shield", _shieldText != null ? $"{_shieldPrefix}{_shield?.CurrentShield ?? 0:F0}" : "MISSING"),
             };
         }
 #endif

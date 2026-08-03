@@ -160,16 +160,17 @@ namespace M2922.Component.Health
             // TOUJOURS appliquer localement d'abord
             ApplyTypedDamage(damage, damageType, source);
 
-            // Puis networker pour les AUTRES clients
+            // Accumuler pour le réseau (plusieurs hits en 1 frame = shotgun, beam, etc.)
+            _syncedDamage = _syncedDamage + damage;
+            _syncedDamageType = damageType;
+            _syncedSourceID = source != null ? source.playerId : -1;
+            _hasPendingDamage = true;
+
             if (Networking.LocalPlayer == null) return;
 
             if (!Networking.IsOwner(gameObject))
                 Networking.SetOwner(Networking.LocalPlayer, gameObject);
 
-            _syncedDamage = damage;
-            _syncedDamageType = damageType;
-            _syncedSourceID = source != null ? source.playerId : -1;
-            _hasPendingDamage = true;
             RequestSerialization();
         }
 

@@ -14,6 +14,7 @@ namespace M2922.Component.Health
     {
         [Header("=== REFERENCES ===")]
         [SerializeField] private M2922_HealthComponent _health;
+        [SerializeField] private M2922_ShieldComponent _shield;
 
         [Header("=== RESPAWN ===")]
         [SerializeField] private bool _autoRespawn = true;
@@ -33,6 +34,7 @@ namespace M2922.Component.Health
         protected override void AutoDetectReferences()
         {
             if (_health == null) _health = GetComponent<M2922_HealthComponent>();
+            if (_shield == null) _shield = GetComponent<M2922_ShieldComponent>();
         }
 
         protected override void Update()
@@ -61,11 +63,33 @@ namespace M2922.Component.Health
         private void Respawn()
         {
             _isDead = false;
+
+            // Restaurer vie et shield
             if (_health != null) _health.Revive();
+            if (_shield != null) _shield.Revive();
+
+            // Drop tous les VRC Pickup tenus
+            DropAllPickups();
+
+            // TP au point de respawn
             if (_respawnPoint != null)
                 transform.SetPositionAndRotation(_respawnPoint.position, _respawnPoint.rotation);
+
             this.Log("Entity respawned.");
-            // TODO: trigger OnRevive event
+        }
+
+        /// <summary>Drop tous les VRC_Pickup actuellement tenus par ce GameObject/enfants.</summary>
+        private void DropAllPickups()
+        {
+            VRC_Pickup[] pickups = GetComponentsInChildren<VRC_Pickup>();
+            if (pickups != null)
+            {
+                for (int i = 0; i < pickups.Length; i++)
+                {
+                    if (pickups[i] != null && pickups[i].IsHeld)
+                        pickups[i].Drop();
+                }
+            }
         }
 
         public void ForceRespawn()
