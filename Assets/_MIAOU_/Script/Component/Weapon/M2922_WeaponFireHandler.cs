@@ -983,9 +983,12 @@ namespace M2922.Component.Weapon
         {
             _isReloading = false;
             _reloadPhase = ReloadPhase.None;
+
+            if (!_isSequentialReload && _weapon != null)
+                _weapon.Reload(); // Mag : remplir le chargeur au max
+
             _isSequentialReload = false;
-            if (_weapon != null) _weapon.Reload(); // Remplit le chargeur au max
-            this.Log("Rechargement termine.");
+            this.Log("Rechargement termine (" + (_weapon != null ? _weapon.CurrentAmmo.ToString() + "/" + _weapon.Magazine.ToString() : "?") + ")");
         }
 
         public void ForceReload()
