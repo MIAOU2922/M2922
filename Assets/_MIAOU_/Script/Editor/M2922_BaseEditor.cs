@@ -17,8 +17,8 @@ namespace M2922.Editor
     [CanEditMultipleObjects]
     public class M2922_BaseEditor : UnityEditor.Editor
     {
-        // Properties gérées manuellement
-        private static readonly HashSet<string> HandledProperties = new HashSet<string>
+        // Properties gérées manuellement (protected pour les classes dérivées)
+        protected static readonly HashSet<string> HandledProperties = new HashSet<string>
         {
             "DEBUG",
             "VERBOSE_DEBUG",
@@ -35,7 +35,7 @@ namespace M2922.Editor
         };
 
         // Properties à cacher conditionnellement
-        private static readonly HashSet<string> GizmoConfigProps = new HashSet<string>
+        protected static readonly HashSet<string> GizmoConfigProps = new HashSet<string>
         {
             "_gizmoOffsetY",
             "_gizmoHeaderScale",
@@ -44,7 +44,7 @@ namespace M2922.Editor
             "_gizmoOnlyWhenSelected",
         };
 
-        private bool _isManager;
+        protected bool _isManager;
 
         // Serialized properties
         private SerializedProperty _propDebug;
@@ -60,7 +60,7 @@ namespace M2922.Editor
         private SerializedProperty _propGizmoHeaderColor;
         private SerializedProperty _propGizmoOnlyWhenSelected;
 
-        private void OnEnable()
+        protected virtual void OnEnable()
         {
             _propDebug = serializedObject.FindProperty("DEBUG");
             _propVerboseDebug = serializedObject.FindProperty("VERBOSE_DEBUG");
@@ -153,7 +153,16 @@ namespace M2922.Editor
                 while (iterator.NextVisible(enterChildren));
             }
 
+            // Hook pour les classes dérivées (UI custom après les propriétés)
+            OnAfterProperties();
+
             serializedObject.ApplyModifiedProperties();
         }
+
+        /// <summary>
+        /// Surchargez cette méthode dans les classes dérivées pour ajouter
+        /// de l'UI custom après l'affichage des propriétés serialized.
+        /// </summary>
+        protected virtual void OnAfterProperties() { }
     }
 }
