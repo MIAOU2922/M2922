@@ -61,6 +61,19 @@ namespace M2922.Component.Weapon
         [Tooltip("Durée de vie du muzzle flash avant destroy (secondes).")]
         [SerializeField] private float _muzzleFlashLifetime = 0.1f;
 
+        [Header("=== SFX ===")]
+        [Tooltip("AudioSource pour les sons. Si null, sera cherché sur ce GameObject.")]
+        [SerializeField] private AudioSource _audioSource;
+        [SerializeField] private AudioClip _fireSound;
+        [SerializeField] private AudioClip _reloadSound;
+        [SerializeField] private AudioClip _emptySound;
+        [Tooltip("Volume du son de tir (0-1).")]
+        [SerializeField] private float _fireVolume = 0.8f;
+        [Tooltip("Volume du son de rechargement (0-1).")]
+        [SerializeField] private float _reloadVolume = 0.7f;
+        [Tooltip("Volume du son tir à vide (0-1).")]
+        [SerializeField] private float _emptyVolume = 0.5f;
+
         [Header("=== PROJECTILE (lanceurs seulement) ===")]
         [SerializeField] private GameObject _projectilePrefab;
         [SerializeField] private int _poolSize = 10;
@@ -83,6 +96,21 @@ namespace M2922.Component.Weapon
         [SerializeField] private float _meleeRange = 2f;
         [SerializeField] private float _meleeRadius = 1.5f;
 
+        [Header("=== RECOIL VISUEL (animation du modèle) ===")]
+        [Tooltip("Transform du modèle 3D à animer. Si null, prend transform.parent.")]
+        [SerializeField] private Transform _weaponModelRoot;
+        private float _recoilKickBack = 0f;
+        private float _recoilKickUp = 0f;
+        private float _recoilKickSide = 0f;
+        private float _recoilRecoverySpeed = 0f;
+        private Vector3 _recoilOriginalLocalPos;
+        private Quaternion _recoilOriginalLocalRot;
+        // Valeurs calculées (remplies dans Start si overrides = 0)
+        private float _finalRecoilKickBack;
+        private float _finalRecoilKickUp;
+        private float _finalRecoilKickSide;
+        private float _finalRecoilRecoverySpeed;
+
         // --- INPUT ---
         private bool _triggerHeld = false;
         private bool _triggerJustPressed = false;
@@ -96,6 +124,7 @@ namespace M2922.Component.Weapon
         private float _chargeTimer = 0f;
         private bool _isCharging = false;
         private bool _beamActive = false;
+        private bool _beamEmptyPlayed = false; // évite spam du son tir à vide sur le beam
         private float _currentSpreadMult = 1f; // multiplicateur de spread (rafale)
         private float _bloomAccum = 0f;        // accumulation bloom en tir continu
         private float _bloomPerShot = 0.3f;    // +0.3 par tir full auto
@@ -156,6 +185,10 @@ namespace M2922.Component.Weapon
                 return;
             }
 
+            // AudioSource : utiliser celui assigné ou en trouver un sur ce GO
+            if (_audioSource == null)
+                _audioSource = GetComponent<AudioSource>();
+
             _weaponType = (WeaponType)_weapon.WeaponTypeAsInt;
             _fireMode = FireModeMapping.GetFireMode(_weaponType);
             _useHitscan = FireModeMapping.UseHitscan(_weaponType);
@@ -174,6 +207,12 @@ namespace M2922.Component.Weapon
                 _beamRenderer.enabled = false;
             }
 
+            // Recoil : capturer la position/rotation locale du modèle
+            if (_weaponModelRoot == null)
+                _weaponModelRoot = transform.parent;
+            ComputeRecoilStats();
+            CaptureRecoilOrigin();
+
             this.Log("FireHandler pret. Mode=" + _fireMode.ToString()
                 + " RPM=" + rpm.ToString()
                 + " Hitscan=" + _useHitscan.ToString()
@@ -186,8 +225,9 @@ namespace M2922.Component.Weapon
             for (int i = 0; i < _poolSize; i++)
             {
                 GameObject obj = Instantiate(_projectilePrefab);
-                obj.transform.SetParent(transform);
-                obj.transform.localPosition = Vector3.zero;
+                // Détacher du weapon pour que les projectiles inactifs ne suivent pas l'arme
+                obj.transform.SetParent(null);
+                obj.transform.position = Vector3.zero;
                 obj.SetActive(false);
                 _pool[i] = obj.GetComponent<M2922_Projectile>();
             }
@@ -226,6 +266,9 @@ namespace M2922.Component.Weapon
             _isHeld = true;
             _localPlayer = Networking.LocalPlayer;
 
+            // Recaler l'origine du recul (nouvelle position dans la main)
+            CaptureRecoilOrigin();
+
             // Transférer ownership du child (WPN_Data) au joueur local.
             // Le VRC Pickup ne transfère que le parent — l'enfant
             // doit être transféré manuellement pour que RequestSerialization() marche.
@@ -240,6 +283,9 @@ namespace M2922.Component.Weapon
             _isCharging = false;
             if (_beamRenderer != null) _beamRenderer.enabled = false;
             _beamActive = false;
+
+            // Reset recul
+            ResetRecoil();
         }
 
         public void HandlePickupUseDown()
@@ -291,6 +337,9 @@ namespace M2922.Component.Weapon
             if (_beamTimer > 0f)
                 _beamTimer -= Time.deltaTime;
 
+            // Recoil visuel : retour progressif à la position d'origine
+            UpdateRecoil();
+
             // Bloom : se résorbe quand on ne tire pas
             if (!_triggerHeld && _bloomAccum > 0f)
             {
@@ -302,6 +351,12 @@ namespace M2922.Component.Weapon
             // Reload state machine
             if (_isReloading)
             {
+                // Désactiver le beam renderer pendant le rechargement
+                // (UpdateBeam() n'est pas appelé pendant le reload, donc on le fait ici)
+                if (_beamRenderer != null) _beamRenderer.enabled = false;
+                _beamActive = false;
+                _syncedBeamActive = false;
+
                 _reloadTimer -= Time.deltaTime;
 
                 switch (_reloadPhase)
@@ -395,6 +450,10 @@ namespace M2922.Component.Weapon
                 case FireMode.Melee:
                 case FireMode.Hybrid:     UpdateMelee(); break;
             }
+
+            // Son tir à vide (sauf beam qui le gère dans UpdateBeam)
+            if (_triggerJustPressed && _fireMode != FireMode.Beam && !CanFire())
+                PlayEmptySound();
 
             _triggerJustPressed = false;
         }
@@ -492,6 +551,26 @@ namespace M2922.Component.Weapon
         {
             if (_triggerHeld)
             {
+                // Vérifier les munitions ; arrêter le beam si vide
+                if (!CanFire())
+                {
+                    if (!_beamEmptyPlayed)
+                    {
+                        PlayEmptySound();
+                        _beamEmptyPlayed = true;
+                    }
+                    _beamActive = false;
+                    _beamDamageAccum = 0f;
+                    _beamHitTarget = null;
+                    _beamTimer = 0f;
+                    if (_beamRenderer != null) _beamRenderer.enabled = false;
+                    _syncedBeamActive = false;
+                    RequestSerialization();
+                    if (_autoReload && _weapon != null && _weapon.NeedsReload())
+                        ReloadWeapon();
+                    return;
+                }
+
                 _beamActive = true;
                 if (_beamRenderer != null && _beamRenderer.positionCount >= 2)
                 {
@@ -513,13 +592,20 @@ namespace M2922.Component.Weapon
                             float dps = _weapon.Impact * Time.deltaTime * 10f;
                             _beamDamageAccum += dps;
                             _beamHitTarget = hit.collider;
-                            if (_beamTimer <= 0f)
+                        }
+
+                        // Consommer une munition par pulse du beam (même sans hitbox)
+                        if (_beamTimer <= 0f)
+                        {
+                            bool didFire = _weapon.Fire();
+                            if (didFire)
                             {
+                                PlayFireSound();
+                                ApplyRecoilKick();
+
                                 if (_beamDamageAccum > 0f && _beamHitTarget != null)
                                 {
-                                    var beamReceiver = _beamHitTarget.GetComponent<M2922_DamageReceiver>();
-                                    if (beamReceiver == null)
-                                        beamReceiver = _beamHitTarget.GetComponentInParent<M2922_DamageReceiver>();
+                                    var beamReceiver = GetDamageReceiver(_beamHitTarget);
                                     if (beamReceiver != null)
                                     {
                                         beamReceiver.SendDamage(_beamDamageAccum, _weapon.DamageTypeAsInt, _localPlayer);
@@ -535,15 +621,37 @@ namespace M2922.Component.Weapon
                                         }
                                     }
                                 }
-                                _beamDamageAccum = 0f;
-                                _beamTimer = 0.1f;
                             }
+                            _beamDamageAccum = 0f;
+                            _beamHitTarget = null;
+                            _beamTimer = 0.1f;
+
+                            // Auto-reload si vide après consommation
+                            if (_autoReload && _weapon.NeedsReload())
+                                ReloadWeapon();
                         }
                     }
                     else
                     {
                         beamEnd = origin + dir * beamRange;
                         _beamRenderer.SetPosition(1, beamEnd);
+
+                        // Même sans collision, consommer une munition par pulse
+                        if (_beamTimer <= 0f)
+                        {
+                            bool didFire = _weapon.Fire();
+                            if (didFire)
+                            {
+                                PlayFireSound();
+                                ApplyRecoilKick();
+                            }
+                            _beamDamageAccum = 0f;
+                            _beamHitTarget = null;
+                            _beamTimer = 0.1f;
+
+                            if (_autoReload && _weapon.NeedsReload())
+                                ReloadWeapon();
+                        }
                     }
 
                     // Sync beam visuel pour les autres joueurs
@@ -553,6 +661,7 @@ namespace M2922.Component.Weapon
             else
             {
                 _beamActive = false;
+                _beamEmptyPlayed = false;
                 _beamDamageAccum = 0f;
                 _beamHitTarget = null;
                 _beamTimer = 0f;
@@ -585,7 +694,7 @@ namespace M2922.Component.Weapon
                 Collider[] hits = Physics.OverlapSphere(pos, _meleeRadius);
                 foreach (var col in hits)
                 {
-                    var receiver = col.GetComponent<M2922_DamageReceiver>();
+                    var receiver = GetDamageReceiver(col);
                     if (receiver != null)
                         receiver.SendDamage(_weapon.Impact * 2f, _weapon.DamageTypeAsInt, _localPlayer);
                 }
@@ -600,7 +709,7 @@ namespace M2922.Component.Weapon
         {
             if (_weapon == null) return;
 
-            _weapon.Fire(); // consomme munition + son propre RequestSerialization
+            if (!_weapon.Fire()) return; // pas de munitions → pas de tir
 
             // Sync l'event de tir pour les autres joueurs (VFX seulement)
             _fireTick = _fireTick + 1;
@@ -610,6 +719,12 @@ namespace M2922.Component.Weapon
 
             // Muzzle flash VFX (local)
             SpawnMuzzleFlash();
+
+            // Fire sound
+            PlayFireSound();
+
+            // Recoil visuel
+            ApplyRecoilKick();
 
             if (_useHitscan)
                 DoHitscan();
@@ -634,6 +749,8 @@ namespace M2922.Component.Weapon
 
                 if (!Networking.IsOwner(gameObject))
                 {
+                    PlayFireSound();
+
                     if (_muzzleFlashPrefab != null)
                     {
                         Vector3 pos = GetMuzzlePos();
@@ -726,10 +843,7 @@ namespace M2922.Component.Weapon
 
             float finalDmg = damage * zoneMult;
 
-            var receiver = hit.collider.GetComponent<M2922_DamageReceiver>();
-            if (receiver == null)
-                receiver = hit.collider.GetComponentInParent<M2922_DamageReceiver>();
-
+            var receiver = GetDamageReceiver(hit.collider);
             if (receiver == null) return;
 
             // Appliquer localement (tireur voit les dégâts)
@@ -766,6 +880,19 @@ namespace M2922.Component.Weapon
         {
             float baseRange = FireModeMapping.GetHitscanRange(_weaponType);
             return baseRange + (_weapon.Range * 0.8f) + (_weapon.Zoom * 1.2f);
+        }
+
+        /// <summary>Multiplicateur de dégâts pour les armes à projectile (lanceurs).</summary>
+        private float GetLauncherDamageMultiplier(WeaponType wt)
+        {
+            switch (wt)
+            {
+                case WeaponType.RocketLauncher:               return 5f;
+                case WeaponType.HeavyGrenadeLauncher:          return 3f;
+                case WeaponType.BreechLoadedGrenadeLauncher:   return 2.5f;
+                case WeaponType.RocketSidearm:                 return 2.5f;
+                default:                                       return 2f; // fallback
+            }
         }
 
         /// <summary>Portée du beam basée sur la stat Range de l'arme.</summary>
@@ -839,11 +966,48 @@ namespace M2922.Component.Weapon
             Vector3 pos = GetMuzzlePos();
             Quaternion rot = GetMuzzleRot();
 
-            float speed = 20f + _weapon.Velocity * 0.3f;
-            float damage = _weapon.Impact * 2f; // Les lanceurs ont un Impact élevé
+            // --- Calculs depuis les stats de l'arme ---
+            float dmgMult = GetLauncherDamageMultiplier(_weaponType);
+            float baseImpact = _weapon.Impact * dmgMult;
+            float blastStat = Mathf.Clamp(_weapon.BlastRadius, 0f, 100f);
+            float velocityStat = Mathf.Clamp(_weapon.Velocity, 0f, 100f);
+
+            // Ratio de répartition impact/explosion (Blast Radius pilote)
+            float splashRatio = Mathf.Lerp(0.20f, 0.80f, blastStat / 100f);
+            float directRatio = 1f - splashRatio;
+
+            // Multiplicateur Velocity sur l'impact direct (+50% max si Velocity=100)
+            float velocityMult = 1f + (velocityStat / 100f) * 0.5f;
+
+            // Dégâts
+            float directDmg = (baseImpact * directRatio) * velocityMult;
+            float splashDmg = baseImpact * splashRatio;
+
+            // Rayon d'explosion (2m → 8m)
+            float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
+
+            // Vitesse du projectile
+            float speed = 15f + velocityStat * 0.5f;
             float lifetime = 5f;
 
-            proj.Launch(pos, rot, speed, damage, _weapon.DamageTypeAsInt, lifetime, _localPlayer, this);
+            float stability = _weapon.Stability;
+            float aimAssist = _weapon.AimAssistance;
+
+            // Gravité : GL = 2.5× plus lourd que les rockets
+            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : 1f;
+
+            proj.Launch(pos, rot, speed,
+                directDmg, splashDmg, explRadius,
+                _weapon.DamageTypeAsInt, lifetime,
+                stability, aimAssist, velocityStat,
+                _weapon.WeaponTypeAsInt, gravityScale,
+                _localPlayer, this);
+        }
+
+        private bool IsGrenadeLauncher(WeaponType wt)
+        {
+            return wt == WeaponType.BreechLoadedGrenadeLauncher
+                || wt == WeaponType.HeavyGrenadeLauncher;
         }
 
         public void ReturnProjectile(M2922_Projectile proj) { }
@@ -857,6 +1021,127 @@ namespace M2922.Component.Weapon
             if (_isReloading) return false;
             if (_fireMode == FireMode.SingleShot) return true;
             return _weapon.CurrentAmmo > 0 || _weapon.InfiniteAmmo;
+        }
+
+        private void PlaySound(AudioClip clip, float volume)
+        {
+            if (_audioSource == null || clip == null) return;
+            _audioSource.PlayOneShot(clip, volume);
+        }
+
+        private void PlayFireSound()   { PlaySound(_fireSound, _fireVolume); }
+        private void PlayReloadSound() { PlaySound(_reloadSound, _reloadVolume); }
+        private void PlayEmptySound()  { PlaySound(_emptySound, _emptyVolume); }
+
+        // ===================================================
+        // RECOIL VISUEL
+        // ===================================================
+
+        /// <summary>Calcule les valeurs de recul depuis les stats de l'arme.</summary>
+        private void ComputeRecoilStats()
+        {
+            if (_weapon == null) return;
+
+            float impact = _weapon.Impact;
+            float stability = _weapon.Stability;
+            float handling = _weapon.Handling;
+            float recoilDir = _weapon.RecoilDirection;
+
+            // KickBack : Impact élevé = plus de recul, Stability élevée = moins de recul
+            float impactFactor = Mathf.Clamp(impact / 100f, 0.2f, 1.5f);
+            float stabFactor = Mathf.Clamp(1f - (stability / 100f), 0.2f, 1f);
+            _finalRecoilKickBack = _recoilKickBack > 0f
+                ? _recoilKickBack
+                : 0.008f + (impactFactor * stabFactor * 0.025f);
+
+            // KickUp : Stability + RecoilDirection
+            float dirFactor = Mathf.Clamp(recoilDir / 100f, 0f, 1f);
+            _finalRecoilKickUp = _recoilKickUp > 0f
+                ? _recoilKickUp
+                : 1f + (stabFactor * 3f) - (dirFactor * 1.5f);
+
+            // KickSide : RecoilDirection pilote le côté
+            _finalRecoilKickSide = _recoilKickSide > 0f
+                ? _recoilKickSide
+                : 0.2f + (dirFactor * 1.5f);
+
+            // Recovery : Handling élevé = retour plus rapide
+            float handlingFactor = Mathf.Clamp(handling / 100f, 0.2f, 1.5f);
+            _finalRecoilRecoverySpeed = _recoilRecoverySpeed > 0f
+                ? _recoilRecoverySpeed
+                : 6f + (handlingFactor * 10f);
+
+            this.Log($"[Recoil] kickBack={_finalRecoilKickBack:F3} kickUp={_finalRecoilKickUp:F1} kickSide={_finalRecoilKickSide:F1} recovery={_finalRecoilRecoverySpeed:F1}");
+        }
+
+        private void CaptureRecoilOrigin()
+        {
+            if (_weaponModelRoot != null)
+            {
+                _recoilOriginalLocalPos = _weaponModelRoot.localPosition;
+                _recoilOriginalLocalRot = _weaponModelRoot.localRotation;
+            }
+        }
+
+        private void ResetRecoil()
+        {
+            if (_weaponModelRoot != null)
+            {
+                _weaponModelRoot.localPosition = _recoilOriginalLocalPos;
+                _weaponModelRoot.localRotation = _recoilOriginalLocalRot;
+            }
+        }
+
+        /// <summary>Applique le kick de recul instantané.</summary>
+        private void ApplyRecoilKick()
+        {
+            if (_weaponModelRoot == null) return;
+            if (!_isHeld) return; // pas de recul si l'arme n'est pas tenue (Rigidbody)
+
+            float side = Random.Range(-_finalRecoilKickSide, _finalRecoilKickSide);
+            _weaponModelRoot.localPosition += Vector3.back * _finalRecoilKickBack;
+            _weaponModelRoot.localRotation *= Quaternion.Euler(-_finalRecoilKickUp, side, 0f);
+        }
+
+        /// <summary>Retour progressif à la position d'origine (appelé chaque frame).</summary>
+        private void UpdateRecoil()
+        {
+            if (_weaponModelRoot == null) return;
+            if (!_isHeld) return; // pas de recul si l'arme n'est pas tenue (Rigidbody)
+
+            float t = 1f - Mathf.Exp(-_finalRecoilRecoverySpeed * Time.deltaTime);
+            _weaponModelRoot.localPosition = Vector3.Lerp(
+                _weaponModelRoot.localPosition, _recoilOriginalLocalPos, t);
+            _weaponModelRoot.localRotation = Quaternion.Slerp(
+                _weaponModelRoot.localRotation, _recoilOriginalLocalRot, t);
+        }
+
+        /// <summary>
+        /// Trouve le DamageReceiver associé au collider touché.
+        /// Utilise le M2922_HitboxSystem (même GameObject que le DamageReceiver)
+        /// et sa méthode IsMyCollider() pour valider l'appartenance.
+        /// </summary>
+        private M2922_DamageReceiver GetDamageReceiver(Collider col)
+        {
+            var receiver = col.GetComponent<M2922_DamageReceiver>();
+            if (receiver != null) return receiver;
+
+            receiver = col.GetComponentInParent<M2922_DamageReceiver>();
+            if (receiver != null) return receiver;
+
+            // Fallback : le collider est sur une branche sœur (ex: Head Collider
+            // sous Armature, alors que DamageReceiver + HitboxSystem sont sous
+            // Player Logic). On cherche le HitboxSystem qui possède ce collider,
+            // puis on prend le DamageReceiver sur le même GameObject.
+            Transform t = col.transform.parent;
+            while (t != null)
+            {
+                var hitboxSys = t.GetComponentInChildren<M2922_HitboxSystem>();
+                if (hitboxSys != null && hitboxSys.IsMyCollider(col))
+                    return hitboxSys.GetComponent<M2922_DamageReceiver>();
+                t = t.parent;
+            }
+            return null;
         }
 
         private Vector3 GetMuzzlePos()
@@ -1008,6 +1293,9 @@ namespace M2922.Component.Weapon
 
             _isReloading = true;
             _isSequentialReload = IsSequential();
+
+            // Reload sound
+            PlayReloadSound();
 
             if (_isSequentialReload)
             {
@@ -1197,6 +1485,40 @@ namespace M2922.Component.Weapon
         {
             base.OnDrawGizmosSelected();
             DrawSpreadGizmo(0.6f);
+            DrawLauncherPreviewGizmo();
+        }
+
+        private void DrawLauncherPreviewGizmo()
+        {
+            if (_weapon == null) return;
+
+            float blastStat = Mathf.Clamp(_weapon.BakedFrameBlastRadius, 0f, 100f);
+            if (blastStat <= 0f) return;
+
+            float splashRatio = Mathf.Lerp(0.20f, 0.80f, blastStat / 100f);
+            float directRatio = 1f - splashRatio;
+            float velStat = Mathf.Clamp(_weapon.BakedFrameVelocity, 0f, 100f);
+            float velMult = 1f + (velStat / 100f) * 0.5f;
+            float baseImpact = _weapon.BakedFrameImpact;
+            float directDmg = (baseImpact * directRatio) * velMult;
+            float splashDmg = baseImpact * splashRatio;
+            float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
+
+            Vector3 muzzlePos = GetMuzzlePos();
+            float alpha = 0.8f;
+
+            // Rayon d'explosion au muzzle
+            UnityEditor.Handles.color = new Color(1f, 0.4f, 0f, alpha * 0.5f);
+            UnityEditor.Handles.DrawWireDisc(muzzlePos, Vector3.up, explRadius);
+            UnityEditor.Handles.DrawWireDisc(muzzlePos, Vector3.right, explRadius);
+            UnityEditor.Handles.DrawWireDisc(muzzlePos, Vector3.forward, explRadius);
+
+            // Label stats lanceur
+            UnityEditor.Handles.color = new Color(1f, 0.6f, 0.2f, alpha);
+            float labelY = muzzlePos.y + explRadius + 0.3f;
+            UnityEditor.Handles.Label(
+                new Vector3(muzzlePos.x, labelY, muzzlePos.z),
+                $"Rocket: Dir={directDmg:F0}  Splash={splashDmg:F0}  R={explRadius:F1}m  Spd={15f + velStat * 0.5f:F0}m/s");
         }
 
         private void DrawSpreadGizmo(float alpha)

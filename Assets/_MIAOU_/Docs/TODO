@@ -1,0 +1,33 @@
+for rp project :
+    - hitbox system (finish)
+    - weapon system ( in progress)
+        - all type off weapon
+        - raycast / projectiles
+        - sounds
+        - relaod methode
+            - auto
+            - manual [E]
+            - manual [VR]
+    - life system (in progress)
+        - for player
+        - for object
+    - inventory system (not start)
+        - holster
+        - ui
+        - weight system
+    - véicule system (not start)
+    - buff system (in progress)
+        - apply buff / debuf , fire , heal , ect...
+    - avatar link system (not start)
+        - bind udon to parameter
+
+for other project :
+    - count system (finish)
+    - permision system (not start)
+    - keypad system (not start)
+    - log system (not start)
+
+    - day/night system (not start)
+    - meteo system (not start)
+    - season system (not start)
+

@@ -177,9 +177,22 @@ namespace M2922.Component.Weapon
         public float Velocity { get { return _finalVelocity; } }
 
         // Stats BAKÉES de la frame (utilisées par le gizmo et l'éditeur)
+        public float BakedFrameImpact { get { return _bakedFrameImpact; } }
         public float BakedFrameRange { get { return _bakedFrameRange; } }
         public float BakedFrameStability { get { return _bakedFrameStability; } }
+        public float BakedFrameHandling { get { return _bakedFrameHandling; } }
+        public float BakedFrameReloadSpeed { get { return _bakedFrameReloadSpeed; } }
         public float BakedFrameAimAssistance { get { return _bakedFrameAimAssistance; } }
+        public float BakedFrameZoom { get { return _bakedFrameZoom; } }
+        public float BakedFrameAirborneEffectiveness { get { return _bakedFrameAirborneEffectiveness; } }
+        public float BakedFrameRecoilDirection { get { return _bakedFrameRecoilDirection; } }
+        public float BakedFrameRPM { get { return _bakedFrameRPM; } }
+        public float BakedFrameChargeTime { get { return _bakedFrameChargeTime; } }
+        public float BakedFrameDrawTime { get { return _bakedFrameDrawTime; } }
+        public int BakedFrameMagazine { get { return _bakedFrameMagazine; } }
+        public float BakedFrameBlastRadius { get { return _bakedFrameBlastRadius; } }
+        public float BakedFrameVelocity { get { return _bakedFrameVelocity; } }
+        public float BakedFrameAccuracy { get { return _bakedFrameAccuracy; } }
         public int FrameReloadStyle { get { return _bakedFrameReloadStyle; } }
 
         // Noms des perks/masterwork/mod rollés

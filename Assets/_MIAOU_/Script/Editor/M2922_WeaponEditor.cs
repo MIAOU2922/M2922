@@ -87,6 +87,38 @@ namespace M2922.Component.Weapon.Editor
                 EditorGUILayout.LabelField("Airborne", FV("_bakedFrameAirborneEffectiveness").ToString("F1"));
                 EditorGUILayout.LabelField("Reload Style", ((ReloadStyle)IV("_bakedFrameReloadStyle")).ToString());
 
+                // ---- LAUNCHER STATS (si BlastRadius > 0) ----
+                float blastStat = FV("_bakedFrameBlastRadius");
+                float velStat = FV("_bakedFrameVelocity");
+                if (blastStat > 0f)
+                {
+                    EditorGUILayout.Space();
+                    EditorGUILayout.LabelField("=== LAUNCHER STATS ===", EditorStyles.boldLabel);
+
+                    float launcherMult = GetLauncherMult((WeaponType)IV("_bakedWeaponType"));
+                    float launcherBaseImpact = baseImpact * launcherMult;
+
+                    float splashRatio = Mathf.Lerp(0.20f, 0.80f, blastStat / 100f);
+                    float directRatio = 1f - splashRatio;
+                    float velMult = 1f + (velStat / 100f) * 0.5f;
+
+                    float directDmg = (launcherBaseImpact * directRatio) * velMult;
+                    float splashDmg = launcherBaseImpact * splashRatio;
+                    float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
+                    float projSpeed = 15f + velStat * 0.5f;
+
+                    Color old = GUI.color;
+                    GUI.color = new Color(1f, 0.7f, 0.3f);
+                    EditorGUILayout.LabelField("Base (Impact × Mult)", $"{baseImpact:F1} × {launcherMult:F1} = {launcherBaseImpact:F1}");
+                    EditorGUILayout.LabelField("Direct Impact", $"{directDmg:F1}  (ratio: {directRatio:P0}, vel mult: ×{velMult:F2})");
+                    EditorGUILayout.LabelField("Splash Damage", $"{splashDmg:F1}  (ratio: {splashRatio:P0})");
+                    EditorGUILayout.LabelField("Explosion Radius", $"{explRadius:F1}m");
+                    EditorGUILayout.LabelField("Projectile Speed", $"{projSpeed:F0} m/s");
+                    EditorGUILayout.LabelField("Blast Radius (stat)", $"{blastStat:F1}");
+                    EditorGUILayout.LabelField("Velocity (stat)", $"{velStat:F1}");
+                    GUI.color = old;
+                }
+
                 // ---- AMMO SETTINGS (editable) ----
                 EditorGUILayout.Space();
                 SerializedProperty infiniteAmmoProp = _so.FindProperty("_infiniteAmmo");
@@ -118,7 +150,18 @@ namespace M2922.Component.Weapon.Editor
 
                 float previewImpact = ComputePreviewStat(0, previewIndices);
                 float previewRange  = ComputePreviewStat(1, previewIndices);
+                float previewStab   = ComputePreviewStat(2, previewIndices);
+                float previewHand   = ComputePreviewStat(3, previewIndices);
+                float previewReload = ComputePreviewStat(4, previewIndices);
+                float previewAA     = ComputePreviewStat(5, previewIndices);
                 float previewZoom   = ComputePreviewStat(6, previewIndices);
+                float previewAir    = ComputePreviewStat(7, previewIndices);
+                float previewRD     = ComputePreviewStat(8, previewIndices);
+                float previewRPM    = ComputePreviewStat(9, previewIndices);
+                float previewCharge = ComputePreviewStat(10, previewIndices);
+                float previewDraw   = ComputePreviewStat(11, previewIndices);
+                float previewBlast  = ComputePreviewStat(13, previewIndices);
+                float previewVel    = ComputePreviewStat(14, previewIndices);
                 float previewDmgMult = GetRawDamageMultiplier((WeaponType)IV("_bakedWeaponType"));
                 float previewEffRange = GetEffectiveRange((WeaponType)IV("_bakedWeaponType"), previewRange, previewZoom);
 
@@ -126,7 +169,39 @@ namespace M2922.Component.Weapon.Editor
                 GUI.color = Color.green;
                 EditorGUILayout.LabelField("Impact  (reel)", $"{previewImpact:F1}  →  raw dmg: {previewImpact * previewDmgMult:F1}");
                 EditorGUILayout.LabelField("Range   (reel)", $"{previewRange:F1}  →  portee: {previewEffRange:F1}m  falloff@{previewEffRange * 0.4f:F1}m");
+                EditorGUILayout.LabelField("Stability", $"{previewStab:F1}");
+                EditorGUILayout.LabelField("Handling", $"{previewHand:F1}");
+                EditorGUILayout.LabelField("Reload", $"{previewReload:F1}");
+                EditorGUILayout.LabelField("AA", $"{previewAA:F1}");
+                EditorGUILayout.LabelField("RecoilDir", $"{previewRD:F1}");
+                EditorGUILayout.LabelField("RPM", $"{previewRPM:F0}");
+                EditorGUILayout.LabelField("Blast Radius", $"{previewBlast:F1}");
+                EditorGUILayout.LabelField("Velocity", $"{previewVel:F1}");
                 GUI.color = oldColor;
+
+                // ---- LAUNCHER PREVIEW ----
+                if (previewBlast > 0f)
+                {
+                    float launcherMult = GetLauncherMult((WeaponType)IV("_bakedWeaponType"));
+                    float launcherBase = previewImpact * launcherMult;
+
+                    float splashRatio = Mathf.Lerp(0.20f, 0.80f, previewBlast / 100f);
+                    float directRatio = 1f - splashRatio;
+                    float velMult = 1f + (previewVel / 100f) * 0.5f;
+                    float directDmg = (launcherBase * directRatio) * velMult;
+                    float splashDmg = launcherBase * splashRatio;
+                    float explRadius = Mathf.Lerp(2.0f, 8.0f, previewBlast / 100f);
+                    float projSpeed = 15f + previewVel * 0.5f;
+
+                    EditorGUILayout.Space();
+                    GUI.color = new Color(1f, 0.6f, 0.1f);
+                    EditorGUILayout.LabelField("Base (Impact × Mult)", $"{previewImpact:F1} × {launcherMult:F1} = {launcherBase:F1}");
+                    EditorGUILayout.LabelField("Dir. Impact (preview)", $"{directDmg:F1}");
+                    EditorGUILayout.LabelField("Splash Dmg (preview)", $"{splashDmg:F1}");
+                    EditorGUILayout.LabelField("Expl. Radius (preview)", $"{explRadius:F1}m");
+                    EditorGUILayout.LabelField("Proj Speed (preview)", $"{projSpeed:F0} m/s");
+                    GUI.color = oldColor;
+                }
             }
             else
             {
@@ -365,9 +440,30 @@ namespace M2922.Component.Weapon.Editor
             };
 
             float total = 0f;
-            if (statIndex == 0) total = FV("_bakedFrameImpact");
-            else if (statIndex == 1) total = FV("_bakedFrameRange");
-            else if (statIndex == 6) total = FV("_bakedFrameZoom");
+            // Map statIndex → baked frame property name
+            string[] framePropMap = {
+                "_bakedFrameImpact",                // 0
+                "_bakedFrameRange",                 // 1
+                "_bakedFrameStability",             // 2
+                "_bakedFrameHandling",              // 3
+                "_bakedFrameReloadSpeed",           // 4
+                "_bakedFrameAimAssistance",         // 5
+                "_bakedFrameZoom",                  // 6
+                "_bakedFrameAirborneEffectiveness", // 7
+                "_bakedFrameRecoilDirection",       // 8
+                "_bakedFrameRPM",                   // 9
+                "_bakedFrameChargeTime",            // 10
+                "_bakedFrameDrawTime",              // 11
+                "_bakedFrameMagazine",              // 12 (int → float)
+                "_bakedFrameBlastRadius",           // 13
+                "_bakedFrameVelocity",              // 14
+                "_bakedFrameAccuracy",              // 15
+            };
+            if (statIndex >= 0 && statIndex < framePropMap.Length)
+            {
+                if (statIndex == 12) total = IV(framePropMap[statIndex]); // Magazine is int
+                else total = FV(framePropMap[statIndex]);
+            }
 
             for (int p = 0; p < 6; p++)
             {
@@ -394,16 +490,24 @@ namespace M2922.Component.Weapon.Editor
             {
                 case WeaponType.Sword:
                 case WeaponType.Glaive:
-                case WeaponType.RocketLauncher:
-                case WeaponType.BreechLoadedGrenadeLauncher:
-                case WeaponType.HeavyGrenadeLauncher:
-                case WeaponType.RocketSidearm:
                     return 2f;
+                case WeaponType.RocketLauncher:
+                    return 5f;
+                case WeaponType.BreechLoadedGrenadeLauncher:
+                case WeaponType.RocketSidearm:
+                    return 2.5f;
+                case WeaponType.HeavyGrenadeLauncher:
+                    return 3f;
                 case WeaponType.TraceRifle:
                     return 10f;
                 default: // Hitscan
                     return 0.5f;
             }
+        }
+
+        private static float GetLauncherMult(WeaponType wt)
+        {
+            return GetRawDamageMultiplier(wt);
         }
 
         /// <summary>
