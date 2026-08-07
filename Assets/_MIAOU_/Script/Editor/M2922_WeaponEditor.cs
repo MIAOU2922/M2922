@@ -482,7 +482,7 @@ namespace M2922.Component.Weapon.Editor
 
         /// <summary>
         /// Multiplicateur Impact → raw damage selon le type d'arme.
-        /// Hitscan: ×0.5 | Projectile/Melee: ×2 | Beam: ×10
+        /// Hitscan: ×0.5 (sauf MachineGun ×1) | Projectile/Melee: ×2 | Beam: ×10
         /// </summary>
         private static float GetRawDamageMultiplier(WeaponType wt)
         {
@@ -500,6 +500,8 @@ namespace M2922.Component.Weapon.Editor
                     return 3f;
                 case WeaponType.TraceRifle:
                     return 10f;
+                case WeaponType.MachineGun:
+                    return 1f;
                 default: // Hitscan
                     return 0.5f;
             }

@@ -151,6 +151,12 @@ namespace M2922.Component.Weapon
         [UdonSynced] private float _syncedSpreadY = 0f;
         private int _lastFireTick = -1;
 
+        // --- NETWORK PROJECTILE (spawn pour clients distants) ---
+        [UdonSynced] private int _projectileFireTick = 0;
+        [UdonSynced] private float _projPosX, _projPosY, _projPosZ;
+        [UdonSynced] private float _projFwdX, _projFwdY, _projFwdZ;
+        private int _lastProjectileFireTick = -1;
+
         // --- NETWORK BEAM (Trace Rifle) ---
         [UdonSynced] private bool _syncedBeamActive = false;
         [UdonSynced] private float _syncedBeamStartX, _syncedBeamStartY, _syncedBeamStartZ;
@@ -729,7 +735,16 @@ namespace M2922.Component.Weapon
             if (_useHitscan)
                 DoHitscan();
             else if (_useProjectile)
+            {
                 SpawnProjectile();
+
+                // Sync le spawn du projectile pour les clients distants
+                Vector3 mPos = GetMuzzlePos();
+                Vector3 mFwd = GetMuzzleRot() * Vector3.forward;
+                _projPosX = mPos.x; _projPosY = mPos.y; _projPosZ = mPos.z;
+                _projFwdX = mFwd.x; _projFwdY = mFwd.y; _projFwdZ = mFwd.z;
+                _projectileFireTick = _projectileFireTick + 1;
+            }
 
             // Auto-reload si vide après le tir
             if (_autoReload && _weapon.NeedsReload())
@@ -780,6 +795,20 @@ namespace M2922.Component.Weapon
                         : null;
                     if (receiver != null)
                         receiver.ApplyTypedDamage(_relayedDamage, _relayedDamageType, null);
+                }
+            }
+
+            // --- PROJECTILE REMOTE SPAWN : les autres joueurs voient le projectile ---
+            if (_projectileFireTick != _lastProjectileFireTick)
+            {
+                _lastProjectileFireTick = _projectileFireTick;
+
+                if (!Networking.IsOwner(gameObject) && _useProjectile && _projectilePrefab != null)
+                {
+                    Vector3 projPos = new Vector3(_projPosX, _projPosY, _projPosZ);
+                    Vector3 projFwd = new Vector3(_projFwdX, _projFwdY, _projFwdZ);
+                    Quaternion projRot = Quaternion.LookRotation(projFwd);
+                    SpawnVisualProjectile(projPos, projRot);
                 }
             }
 
@@ -864,7 +893,7 @@ namespace M2922.Component.Weapon
         private float ComputeDamage(float distance, float maxRange)
         {
             // Falloff : dégâts complets à courte portée, réduits à longue portée
-            float baseDamage = _weapon.Impact * 0.5f;
+            float baseDamage = _weapon.Impact * GetHitscanDamageMultiplier(_weaponType);
 
             // Début du falloff à 65% de la range max (Open World)
             float falloffStart = maxRange * 0.65f;
@@ -892,6 +921,16 @@ namespace M2922.Component.Weapon
                 case WeaponType.BreechLoadedGrenadeLauncher:   return 2.5f;
                 case WeaponType.RocketSidearm:                 return 2.5f;
                 default:                                       return 2f; // fallback
+            }
+        }
+
+        /// <summary>Multiplicateur de dégâts pour les armes hitscan (raycast).</summary>
+        private float GetHitscanDamageMultiplier(WeaponType wt)
+        {
+            switch (wt)
+            {
+                case WeaponType.MachineGun:              return 1f;
+                default:                                 return 0.5f;
             }
         }
 
@@ -1011,6 +1050,46 @@ namespace M2922.Component.Weapon
         }
 
         public void ReturnProjectile(M2922_Projectile proj) { }
+
+        /// <summary>
+        /// Spawn un projectile visuel uniquement pour les clients distants.
+        /// Même pool, mêmes stats de trajectoire, mais aucun dégât.
+        /// </summary>
+        private void SpawnVisualProjectile(Vector3 pos, Quaternion rot)
+        {
+            if (_pool == null || _pool.Length == 0) return;
+
+            M2922_Projectile proj = null;
+            int attempts = 0;
+            int idx = _poolIndex;
+            while (attempts < _poolSize)
+            {
+                if (!_pool[idx].IsActive)
+                {
+                    proj = _pool[idx];
+                    break;
+                }
+                idx = (idx + 1) % _poolSize;
+                attempts++;
+            }
+            if (proj == null) return;
+
+            // Mêmes calculs de stats que SpawnProjectile() pour la trajectoire
+            float velocityStat = Mathf.Clamp(_weapon.Velocity, 0f, 100f);
+            float blastStat = Mathf.Clamp(_weapon.BlastRadius, 0f, 100f);
+            float speed = 15f + velocityStat * 0.5f;
+            float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
+            float lifetime = 5f;
+            float stability = _weapon.Stability;
+            float aimAssist = _weapon.AimAssistance;
+            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : 1f;
+
+            proj.LaunchVisual(pos, rot, speed,
+                explRadius, lifetime,
+                stability, aimAssist, velocityStat,
+                _weapon.WeaponTypeAsInt, gravityScale,
+                this);
+        }
 
         // ===================================================
         // HELPERS

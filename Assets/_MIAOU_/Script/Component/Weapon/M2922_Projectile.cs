@@ -51,6 +51,11 @@ namespace M2922.Component.Weapon
         [Header("=== POOLING ===")]
         private M2922_WeaponFireHandler _pool;
 
+        [Header("=== NETWORK ===")]
+        /// <summary>Quand true, le projectile est visuel uniquement (spawné par un client distant).
+        /// Les dégâts ne sont PAS appliqués — seul le VFX et la trajectoire sont joués.</summary>
+        private bool _visualOnly = false;
+
         [Header("=== FILTRAGE ===")]
         [Tooltip("Nom du layer Unity pour les hitboxes.")]
         [SerializeField] private string _hitboxLayerName = "Hitbox";
@@ -98,6 +103,40 @@ namespace M2922.Component.Weapon
             _hasAimAssist = (weaponType == 13 || weaponType == 18); // RocketLauncher=13, RocketSidearm=18
             _velocity = rotation * Vector3.forward * _speed;
             _initialDirection = _velocity.normalized;
+            _visualOnly = false;
+            gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// Lance un projectile visuel uniquement (pour les clients distants).
+        /// Aucun dégât n'est appliqué — seule la trajectoire et les VFX sont joués.
+        /// </summary>
+        public void LaunchVisual(Vector3 position, Quaternion rotation, float speed,
+            float explRadius, float lifetime,
+            float stability, float aimAssist, float velocityStat,
+            int weaponType, float gravityScale,
+            M2922_WeaponFireHandler pool)
+        {
+            transform.SetPositionAndRotation(position, rotation);
+            _speed = speed;
+            _directDamage = 0f;
+            _splashDamage = 0f;
+            _explosionRadius = explRadius;
+            _damageType = 0;
+            _lifetime = lifetime;
+            _elapsed = 0f;
+            _active = true;
+            _owner = null;
+            _pool = pool;
+            _stability = stability;
+            _aimAssistance = aimAssist;
+            _velocityStat = velocityStat;
+            _gravityScale = gravityScale;
+            _weaponType = weaponType;
+            _hasAimAssist = (weaponType == 13 || weaponType == 18);
+            _velocity = rotation * Vector3.forward * _speed;
+            _initialDirection = _velocity.normalized;
+            _visualOnly = true;
             gameObject.SetActive(true);
         }
 
@@ -105,6 +144,9 @@ namespace M2922.Component.Weapon
         {
             _active = false;
             _elapsed = 0f;
+            _velocity = Vector3.zero;
+            if (_rigidbody != null)
+                _rigidbody.velocity = Vector3.zero;
             gameObject.SetActive(false);
             if (_pool != null)
                 _pool.ReturnProjectile(this);
@@ -216,8 +258,8 @@ namespace M2922.Component.Weapon
         {
             if (!_active) return;
 
-            // Hitbox : appliquer les dégâts directs + explosion
-            if (other.gameObject.layer == _hitboxLayer)
+            // Hitbox : appliquer les dégâts directs (sauf si visuel-only)
+            if (!_visualOnly && other.gameObject.layer == _hitboxLayer)
             {
                 float zoneMult = 1f;
                 var dmgMult = other.GetComponent<M2922_DamageMultiplier>();
@@ -258,8 +300,8 @@ namespace M2922.Component.Weapon
 
         private void Explode()
         {
-            // Dégâts de zone : toutes les hitboxes dans le rayon
-            if (_splashDamage > 0f && _explosionRadius > 0f)
+            // Dégâts de zone : toutes les hitboxes dans le rayon (sauf si visuel-only)
+            if (!_visualOnly && _splashDamage > 0f && _explosionRadius > 0f)
             {
                 Collider[] hits = Physics.OverlapSphere(transform.position, _explosionRadius,
                     1 << _hitboxLayer, QueryTriggerInteraction.Collide);
