@@ -1032,8 +1032,8 @@ namespace M2922.Component.Weapon
             float stability = _weapon.Stability;
             float aimAssist = _weapon.AimAssistance;
 
-            // Gravité : GL = 2.5× plus lourd que les rockets
-            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : 1f;
+            // Gravité : GL = 2.5×, Rockets = 0.5×, autres = 1×
+            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
 
             proj.Launch(pos, rot, speed,
                 directDmg, splashDmg, explRadius,
@@ -1047,6 +1047,12 @@ namespace M2922.Component.Weapon
         {
             return wt == WeaponType.BreechLoadedGrenadeLauncher
                 || wt == WeaponType.HeavyGrenadeLauncher;
+        }
+
+        private bool IsRocketLauncher(WeaponType wt)
+        {
+            return wt == WeaponType.RocketLauncher
+                || wt == WeaponType.RocketSidearm;
         }
 
         public void ReturnProjectile(M2922_Projectile proj) { }
@@ -1082,7 +1088,7 @@ namespace M2922.Component.Weapon
             float lifetime = 5f;
             float stability = _weapon.Stability;
             float aimAssist = _weapon.AimAssistance;
-            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : 1f;
+            float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
 
             proj.LaunchVisual(pos, rot, speed,
                 explRadius, lifetime,

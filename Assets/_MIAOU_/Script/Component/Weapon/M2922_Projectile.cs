@@ -31,7 +31,7 @@ namespace M2922.Component.Weapon
         private float _stability = 50f;       // 0-100, haut = vol plus droit
         private float _aimAssistance = 30f;   // 0-100, haut = cône d'aide à la visée plus large
         private float _velocityStat = 50f;    // 0-100, haut = réduit le cône d'aim assist
-        private float _gravityScale = 1f;     // défini par Launch() selon le type d'arme
+        private float _gravityScale = 1f;     // défini par Launch() selon le type d'arme (0.5=rocket, 2.5=GL)
         private int _weaponType = 0;          // WeaponType : RocketLauncher=13 → aim assist, GL=11,12 → pas
         private bool _hasAimAssist = false;
         private Vector3 _initialDirection;
@@ -75,7 +75,7 @@ namespace M2922.Component.Weapon
         /// <param name="stability">Stat Stability 0-100 (vol droit).</param>
         /// <param name="aimAssist">Stat AimAssistance 0-100 (cône d'aide à la visée).</param>
         /// <param name="velocityStat">Stat Velocity 0-100 (réduit le cône d'aim assist).</param>
-        /// <param name="gravityScale">Multiplicateur de gravité (1=rocket, 2.5=GL).</param>
+        /// <param name="gravityScale">Multiplicateur de gravité (0.5=rocket, 2.5=GL, 1=autres).</param>
         public void Launch(Vector3 position, Quaternion rotation, float speed,
             float directDmg, float splashDmg, float explRadius,
             int damageType, float lifetime,
