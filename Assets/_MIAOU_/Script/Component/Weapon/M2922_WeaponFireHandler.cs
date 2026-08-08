@@ -917,29 +917,39 @@ namespace M2922.Component.Weapon
             }
             if (receiver == null) return;
 
-            // Déterminer la cible : utiliser Networking.GetOwner (fonctionne pour les
-            // Player Objects spawnés par VRC_SceneDescriptor, où chaque joueur est
-            // owner de sa propre copie).
-            VRCPlayerApi targetOwner = Networking.GetOwner(receiver.gameObject);
-            if (targetOwner != null && targetOwner != _localPlayer)
+            // 1. NPC/destructible (identifié par le HitboxSystem.EntityId)
+            //    Prioritaire sur Networking.GetOwner car les objets de scène
+            //    appartiennent TOUS au master, mais ne sont PAS des Player Objects.
+            if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
             {
-                // PvP : le propriétaire du Player Object est un autre joueur
-                _relayTargetId = targetOwner.playerId;
-                _relayIsNpc = false;
-                _relayEntityId = -1;
-            }
-            else if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
-            {
-                // NPC/destructible (identifié via l'entityId du HitboxSystem)
                 _relayTargetId = -1;
                 _relayIsNpc = true;
                 _relayEntityId = receiver.HitboxSystem.EntityId;
             }
+            // 2. Player Object lié (BoundPlayerId >= 0)
+            else if (receiver.HitboxSystem != null && receiver.HitboxSystem.BoundPlayerId >= 0)
+            {
+                int boundId = receiver.HitboxSystem.BoundPlayerId;
+                if (boundId == _localPlayer.playerId) return; // pas de relai sur soi-même
+                _relayTargetId = boundId;
+                _relayIsNpc = false;
+                _relayEntityId = -1;
+            }
+            // 3. Fallback : utiliser Networking.GetOwner (dernier recours)
             else
             {
-                // Impossible d'identifier la cible → pas de relai
-                this.Warning("[FireHandler] SendRelay ignoré: cible non identifiable (pas de owner, pas d'entityId)");
-                return;
+                VRCPlayerApi targetOwner = Networking.GetOwner(receiver.gameObject);
+                if (targetOwner != null && targetOwner != _localPlayer)
+                {
+                    _relayTargetId = targetOwner.playerId;
+                    _relayIsNpc = false;
+                    _relayEntityId = -1;
+                }
+                else
+                {
+                    this.Warning("[FireHandler] SendRelay ignoré: cible non identifiable");
+                    return;
+                }
             }
 
             _relayShooterId = _localPlayer.playerId;

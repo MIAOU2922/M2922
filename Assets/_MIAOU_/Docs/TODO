@@ -8,6 +8,9 @@ for rp project :
             - auto
             - manual [E]
             - manual [VR]
+        - melee
+            - trigger to swap weapon direction up/down [ toggle per definition ]
+        - two handed [ configurable ]
     - life system (in progress)
         - for player
         - for object

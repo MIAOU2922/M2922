@@ -1,0 +1,175 @@
+#T#PoiGeoParticleProperties
+[HideInInspector] m_geoDissolve ("Geometric Dissolve", Float) = 0
+[Header(Base Mesh Controls)]
+_BaseColor ("Base Color", Color) = (1, 1, 1, 1)
+_MainTex ("Base Texture", 2D) = "white" { }
+
+[Header(Particle Controls)]
+_ParticleColor ("Particle Color", Color) = (1, 1, 1, 1)
+_ParticleTexture ("Particle Texture", 2D) = "white" { }
+_ColorFromBaseMin ("Color From Base Min", Range(0, 1)) = 0
+_ColorFromBaseMax ("Color From Base Max", Range(0, 1)) = 0
+[Space]
+_Density ("Particles Per cm^2", Range(0, 20)) = 1
+_ParticleSize ("Particle Size", Range(0.01, 1.0)) = 0.05
+
+[Header(Animation And Lifetime)]
+[Enum(Still, 0, Outward, 1)] _MotionMode ("Motion Mode", Float) = 0
+_MinTravelDistance ("Min Travel Distance", Range(0, 10)) = 0.5
+_MaxTravelDistance ("Max Travel Distance", Range(0, 10)) = 1.0
+_CycleDuration ("Cycle Duration (Seconds)", Range(0.1, 10.0)) = 3.0
+[Space]
+_FloatDistance ("Float Distance", Range(0, 5)) = 0.1
+_BobbingSpeed ("Bobbing Speed", Range(0, 10)) = 1.0
+_BobbingAmount ("Bobbing Amount", Range(0, 2)) = 0.05
+[Space]
+_NoiseTex ("Noise Texture (RGB)", 2D) = "gray" { }
+_NoiseStrength ("Noise Strength", Range(0, 2)) = 0.2
+_NoiseScrollSpeed ("Noise Scroll Speed", Range(0, 5)) = 1.0
+[Space]
+_RotationSpeed ("Rotation Speed", Range(-20, 20)) = 5.0
+
+#T#PoiGeoParticleVariables
+sampler2D _ParticleTexture;
+sampler2D _NoiseTex;
+float4 _BaseColor;
+float4 _ParticleColor;
+float _ColorFromBaseMin;
+float _ColorFromBaseMax;
+float _Density;
+float _ParticleSize;
+float _FloatDistance;
+float _BobbingSpeed;
+float _BobbingAmount;
+float _NoiseStrength;
+float _NoiseScrollSpeed;
+float _RotationSpeed;
+float _MotionMode;
+float _MinTravelDistance;
+float _MaxTravelDistance;
+float _CycleDuration;
+
+#T#PoiGeoParticleProgram
+float rand(float2 co)
+{
+	return frac(sin(dot(co.xy, float2(12.9898, 78.233))) * 43758.5453);
+}
+
+[maxvertexcount(40)]
+void GeometryProgram(triangle VertexOut input[3], inout TriangleStream<VertexOut> triStream, uint primID : SV_PrimitiveID)
+{
+	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input[0]);
+	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input[1]);
+	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input[2]);
+	
+	float3 v0_world = input[0].worldPos.xyz;
+	float3 v1_world = input[1].worldPos.xyz;
+	float3 v2_world = input[2].worldPos.xyz;
+
+	float3 side1 = v1_world - v0_world;
+	float3 side2 = v2_world - v0_world;
+	float area_m2 = length(cross(side1, side2)) * 0.5;
+	
+	float desiredCount = (area_m2 * 10000.0) * _Density;
+
+	float stable_random = rand(float2(primID, primID * 0.1234));
+	int finalSpawnCount = floor(desiredCount + stable_random);
+
+	finalSpawnCount = min(finalSpawnCount, 10);
+	
+	if (finalSpawnCount == 0) return;
+
+	float3 normal = normalize(input[0].normal + input[1].normal + input[2].normal);
+	float4 avg_tangent_w = (input[0].tangent + input[1].tangent + input[2].tangent) / 3.0;
+	float3 tangent = normalize(avg_tangent_w.xyz);
+	float3 bitangent = cross(normal, tangent) * avg_tangent_w.w;
+
+	[loop]
+	for (int i = 0; i < finalSpawnCount; i++)
+	{
+		float2 particle_seed_base = float2(primID * 0.51, i * 1.123);
+		float r1 = rand(particle_seed_base);
+		float r2 = rand(particle_seed_base.yx);
+		
+		if (r1 + r2 > 1.0)
+		{
+			r1 = 1.0 - r1; r2 = 1.0 - r2;
+		}
+
+		float3 randomPointInTriangle = v0_world + r1 * side1 + r2 * side2;
+
+		float startTimeOffset = rand(particle_seed_base + 0.1);
+		float bob_rand = rand(particle_seed_base + 0.2);
+		float rot_rand = rand(particle_seed_base + 0.3);
+		float2 noise_rand = float2(rand(particle_seed_base + 0.4), rand(particle_seed_base + 0.5));
+		float travel_rand = rand(particle_seed_base + 0.6);
+		float color_blend_rand = rand(particle_seed_base + 0.7);
+
+		float progress = frac((_Time.y / _CycleDuration) + startTimeOffset);
+		float3 basePos = randomPointInTriangle;
+		
+		if (_MotionMode > 0.5)
+		{
+			float specificTravelDistance = lerp(_MinTravelDistance, _MaxTravelDistance, travel_rand);
+			basePos += normal * specificTravelDistance * progress;
+		}
+
+		float bobOffset = sin(_Time.y * _BobbingSpeed + bob_rand * 10.0) * _BobbingAmount;
+		float3 floatPos = basePos + normal * (_FloatDistance + bobOffset);
+		
+		float2 noiseUV1 = noise_rand + _Time.y * _NoiseScrollSpeed * 0.1;
+		float2 noiseUV2 = noise_rand.yx + _Time.y * _NoiseScrollSpeed * 0.13;
+		float noiseValX = tex2Dlod(_NoiseTex, float4(noiseUV1, 0, 0)).r * 2.0 - 1.0;
+		float noiseValY = tex2Dlod(_NoiseTex, float4(noiseUV2, 0, 0)).g * 2.0 - 1.0;
+		float3 noiseOffset = (tangent * noiseValX + bitangent * noiseValY) * _NoiseStrength;
+		float3 particleCenter = floatPos + noiseOffset;
+
+		float angle = (_Time.y + rot_rand * 10.0) * _RotationSpeed;
+		float s, c;
+		sincos(angle, s, c);
+		float2x2 rotMatrix = float2x2(c, -s, s, c);
+
+		float3 camRight = normalize(cross(UNITY_MATRIX_V[2].xyz, UNITY_MATRIX_V[1].xyz));
+		float3 camUp = UNITY_MATRIX_V[1].xyz;
+		float halfSize = _ParticleSize * 0.5f;
+
+		ParticleG2F o;
+		o.progress = progress;
+		o.baseColor = finalBaseColor;
+		o.colorBlend = lerp(_ColorFromBaseMin, _ColorFromBaseMax, color_blend_rand);
+		
+		float2 corner_offset = mul(rotMatrix, float2(-halfSize, -halfSize));
+		o.pos = UnityWorldToClipPos(particleCenter + camRight * corner_offset.x + camUp * corner_offset.y);
+		o.uv = float2(0, 0);
+		triStream.Append(o);
+		
+		corner_offset = mul(rotMatrix, float2(halfSize, -halfSize));
+		o.pos = UnityWorldToClipPos(particleCenter + camRight * corner_offset.x + camUp * corner_offset.y);
+		o.uv = float2(1, 0);
+		triStream.Append(o);
+
+		corner_offset = mul(rotMatrix, float2(-halfSize, halfSize));
+		o.pos = UnityWorldToClipPos(particleCenter + camRight * corner_offset.x + camUp * corner_offset.y);
+		o.uv = float2(0, 1);
+		triStream.Append(o);
+		
+		corner_offset = mul(rotMatrix, float2(halfSize, halfSize));
+		o.pos = UnityWorldToClipPos(particleCenter + camRight * corner_offset.x + camUp * corner_offset.y);
+		o.uv = float2(1, 1);
+		triStream.Append(o);
+
+		triStream.RestartStrip();
+	}
+}
+
+#T#PoiGeoParticleVertexOutVariable
+float4 isGeoParticle : TEXCOORD18;
+
+#T#PoiGeoParticleFragFunction
+void poiGeoParticle(inout PoiFragData poiFragData, in PoiMesh poiMesh, inout PoiMods poiMods, in PoiCam poiCam)
+{
+
+}
+
+#T#PoiGeoParticleFragFunctionCall
+poiGeoParticle(poiFragData, poiMesh, poiMods, poiCam);

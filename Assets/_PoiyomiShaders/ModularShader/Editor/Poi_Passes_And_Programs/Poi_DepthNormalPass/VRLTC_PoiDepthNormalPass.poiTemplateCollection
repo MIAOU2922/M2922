@@ -1,0 +1,42 @@
+#T#DepthNormalPassTags
+Name "DepthNormals"
+Tags { "LightMode" = "DepthNormals" }
+
+#T#DepthNormalPassStencil
+#K#DEPTHNORMAL_PASS_STENCIL
+
+#T#DepthNormalPassBlendSettings
+ZWrite [_ZWrite]
+Cull [_Cull]
+AlphaToMask Off
+ZTest [_ZTest]
+Offset [_OffsetFactor], [_OffsetUnits]
+
+BlendOp [_BlendOp], [_BlendOpAlpha]
+Blend [_SrcBlend] [_DstBlend], [_SrcBlendAlpha] [_DstBlendAlpha]
+
+#T#DepthNormalPassOnlyKeywords
+#pragma multi_compile_instancing
+#define POI_PASS_DEPTHNORMAL
+
+#T#DepthNormalPassKeywords
+#K#DEPTHNORMAL_PASS_KEYWORDS
+
+#T#DepthNormalPassPropertyVariables
+#K#DEPTHNORMAL_PROPERTY_VARIABLES
+
+#T#DepthNormalPassPrograms
+#K#VERTEX_DEPTHNORMAL_DATA_STRUCTURES
+#K#VERTEX_DEPTHNORMAL_FUNCTIONS_EARLY
+#K#VERTEX_DEPTHNORMAL_FUNCTIONS
+#K#VERTEX_DEPTHNORMAL_FUNCTIONS_LATE
+#K#VERTEX_DEPTHNORMAL_PROGRAM
+
+#K#HULLDOMAIN_DEPTHNORMAL_PROGRAM
+#K#GEOMETRY_DEPTHNORMAL_PROGRAM
+
+#K#FRAGMENT_DEPTHNORMAL_DATA_STRUCTURES
+#K#FRAGMENT_DEPTHNORMAL_FUNCTIONS_EARLY
+#K#FRAGMENT_DEPTHNORMAL_FUNCTIONS
+#K#FRAGMENT_DEPTHNORMAL_FUNCTIONS_LATE
+#K#FRAGMENT_DEPTHNORMAL_PROGRAM

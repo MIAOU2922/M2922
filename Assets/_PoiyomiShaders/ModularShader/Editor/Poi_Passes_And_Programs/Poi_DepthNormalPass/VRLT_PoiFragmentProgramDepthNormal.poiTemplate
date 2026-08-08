@@ -1,0 +1,36 @@
+// Poi fragement program from PoiFragmentProgramDepthNormal.poiTemplate
+float4 frag(VertexOut i, uint facing : SV_IsFrontFace) : SV_Target
+{
+	#K#FRAGMENT_DEPTHNORMAL_FIRSTLINE
+	
+	UNITY_SETUP_INSTANCE_ID(i);
+	UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+
+	#K#FRAGMENT_DEPTHNORMAL_DECLARATIONS
+
+	#K#FRAGMENT_DEPTHNORMAL_INIT_EARLY
+	#K#FRAGMENT_DEPTHNORMAL_INIT
+	#K#FRAGMENT_DEPTHNORMAL_INIT_LATE
+
+	#K#FRAGMENT_DEPTHNORMAL_COLOR_EARLY
+	#K#FRAGMENT_DEPTHNORMAL_COLOR
+	#K#FRAGMENT_DEPTHNORMAL_COLOR_LATE
+
+	#K#FRAGMENT_DEPTHNORMAL_RETURN
+	
+	if (_Mode == POI_MODE_OPAQUE)
+	{
+		poiFragData.alpha = 1;
+	}
+	
+	clip(poiFragData.alpha - _Cutoff);
+
+	// Encode normal into RGB channels (normalize to ensure unit length)
+	float3 normal = normalize(i.normal);
+	
+	// Remap from [-1,1] to [0,1] range
+	float3 normalColor = normal * 0.5 + 0.5;
+	
+	// Output RGB = encoded normal, A = 1
+	return float4(0,1,0, 1);
+}
