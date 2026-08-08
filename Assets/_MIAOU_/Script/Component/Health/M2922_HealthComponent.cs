@@ -22,6 +22,9 @@ namespace M2922.Component.Health
         [SerializeField] private float _regenDelay = 3f;
         private float _lastDamageTime = -999f;
 
+        [Header("=== NETWORK AUTHORITY ===")]
+        [SerializeField] private M2922_HitboxSystem _hitboxSystem;
+
         public float CurrentHP => _currentHP;
         public float MaxHP => _maxHP;
         public float RegenPerSecond => _regenPerSecond;
@@ -31,6 +34,7 @@ namespace M2922.Component.Health
         protected override void Start()
         {
             base.Start();
+            if (_hitboxSystem == null) _hitboxSystem = GetComponent<M2922_HitboxSystem>();
             _currentHP = _maxHP;
         }
 
@@ -43,24 +47,47 @@ namespace M2922.Component.Health
             }
         }
 
+        /// <summary>True si ce client est l'autorité réseau pour sync ce composant.</summary>
+        private bool ShouldSync()
+        {
+            if (_hitboxSystem != null)
+            {
+                bool authority = _hitboxSystem.IsNetworkingAuthority();
+                if (VERBOSE_DEBUG)
+                    this.Log($"[Health] ShouldSync via HitboxSystem: authority={authority}, boundId={_hitboxSystem.BoundPlayerId}, isOwner={Networking.IsOwner(gameObject)}");
+                return authority;
+            }
+            bool fallback = Networking.IsOwner(gameObject);
+            if (VERBOSE_DEBUG)
+                this.Log($"[Health] ShouldSync fallback (no HitboxSystem): isOwner={fallback}");
+            return fallback;
+        }
+
         public void TakeDamage(float amount)
         {
             _currentHP = Mathf.Max(0f, _currentHP - amount);
             _lastDamageTime = Time.time;
-            if (Networking.IsOwner(gameObject)) RequestSerialization();
+            bool sync = ShouldSync();
+            if (sync)
+            {
+                RequestSerialization();
+                if (DEBUG) this.Log($"[Health] TakeDamage({amount:F1}) → HP={_currentHP:F1}, serialization demandée");
+            }
+            else if (DEBUG)
+                this.Log($"[Health] TakeDamage({amount:F1}) → HP={_currentHP:F1}, PAS de serialization (pas autorité)");
         }
 
         public void Heal(float amount)
         {
             _currentHP = Mathf.Min(_maxHP, _currentHP + amount);
-            if (Networking.IsOwner(gameObject)) RequestSerialization();
+            if (ShouldSync()) RequestSerialization();
         }
 
         public void Revive()
         {
             _currentHP = _maxHP;
             _lastDamageTime = -999f;
-            if (Networking.IsOwner(gameObject)) RequestSerialization();
+            if (ShouldSync()) RequestSerialization();
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR

@@ -162,12 +162,29 @@ namespace M2922.Component.Weapon
         [UdonSynced] private float _syncedBeamStartX, _syncedBeamStartY, _syncedBeamStartZ;
         [UdonSynced] private float _syncedBeamEndX, _syncedBeamEndY, _syncedBeamEndZ;
 
-        // --- NETWORK PLAYER DAMAGE RELAY ---
-        [UdonSynced] private int _relayedTargetID = -1;
-        [UdonSynced] private float _relayedDamage = 0f;
-        [UdonSynced] private int _relayedDamageType = 0;
+        // --- NETWORK DAMAGE RELAY (PvP + NPC) ---
+        /// <summary>Player ID de la CIBLE (-1 = NPC/destructible).</summary>
+        [UdonSynced] private int _relayTargetId = -1;
+        /// <summary>Dégâts accumulés (shotgun multi-pellet, beam pulses).</summary>
+        [UdonSynced] private float _relayDamage = 0f;
+        [UdonSynced] private int _relayDamageType = 0;
+        /// <summary>Entity ID pour les NPCs (via HitboxSystem._entityId).</summary>
+        [UdonSynced] private int _relayEntityId = -1;
+        /// <summary>True si cible = NPC (sinon PvP).</summary>
+        [UdonSynced] private bool _relayIsNpc = false;
+        /// <summary>Player ID du TIREUR (pour éviter double-apply).</summary>
+        [UdonSynced] private int _relayShooterId = -1;
+        /// <summary>N° de séquence incrémenté à chaque batch.</summary>
         [UdonSynced] private int _relaySequence = 0;
-        private int _lastRelaySequence = -1;
+        private int _lastRelaySeq = -1;
+        /// <summary>Frame du dernier reset de l'accumulateur _relayDamage.</summary>
+        private int _relayFrame = -1;
+
+        // --- RELAY BATCH (projectile splash multi-cibles) ---
+        private M2922_DamageReceiver[] _batchReceivers = new M2922_DamageReceiver[16];
+        private float[] _batchDamages = new float[16];
+        private int _batchCount = 0;
+        private int _batchIndex = 0;
 
         // ===================================================
         // LIFECYCLE
@@ -275,11 +292,14 @@ namespace M2922.Component.Weapon
             // Recaler l'origine du recul (nouvelle position dans la main)
             CaptureRecoilOrigin();
 
-            // Transférer ownership du child (WPN_Data) au joueur local.
-            // Le VRC Pickup ne transfère que le parent — l'enfant
-            // doit être transféré manuellement pour que RequestSerialization() marche.
-            if (_localPlayer != null && !Networking.IsOwner(gameObject))
+            // Transférer l'ownership du GameObject "Logic" au porteur.
+            // Nécessite un VRCObjectSync sur ce GameObject (à ajouter dans TOUS les prefabs d'arme).
+            // Sans VRCObjectSync, SetOwner échoue silencieusement → RequestSerialization() ne marche pas.
+            bool wasOwner = Networking.IsOwner(gameObject);
+            if (_localPlayer != null && !wasOwner)
                 Networking.SetOwner(_localPlayer, gameObject);
+
+            this.Log($"[FireHandler] HandlePickup — localPlayer={(_localPlayer != null ? _localPlayer.displayName : "NULL")}, wasOwner={wasOwner}, isOwnerNow={Networking.IsOwner(gameObject)}");
         }
 
         public void HandleDrop()
@@ -342,6 +362,23 @@ namespace M2922.Component.Weapon
             // Beam timer (accumule pour éviter spam réseau)
             if (_beamTimer > 0f)
                 _beamTimer -= Time.deltaTime;
+
+            // Relay batch : envoyer 1 cible par frame (projectile splash multi-cibles)
+            if (_batchCount > 0 && _batchIndex < _batchCount)
+            {
+                var recv = _batchReceivers[_batchIndex];
+                float dmg = _batchDamages[_batchIndex];
+                _batchIndex++;
+                if (recv != null && dmg > 0f)
+                    SendRelay(dmg, _weapon != null ? _weapon.DamageTypeAsInt : 0, recv);
+
+                // Nettoyer le batch une fois tout envoyé
+                if (_batchIndex >= _batchCount)
+                {
+                    _batchCount = 0;
+                    _batchIndex = 0;
+                }
+            }
 
             // Recoil visuel : retour progressif à la position d'origine
             UpdateRecoil();
@@ -555,6 +592,26 @@ namespace M2922.Component.Weapon
 
         private void UpdateBeam()
         {
+            // Non-owners : le beam est piloté par les variables [UdonSynced], pas par l'input local.
+            // On applique l'état synchronisé chaque frame pour un rendu fluide.
+            if (!Networking.IsOwner(gameObject))
+            {
+                if (_beamRenderer != null && _beamRenderer.positionCount >= 2)
+                {
+                    if (_syncedBeamActive)
+                    {
+                        _beamRenderer.enabled = true;
+                        _beamRenderer.SetPosition(0, new Vector3(_syncedBeamStartX, _syncedBeamStartY, _syncedBeamStartZ));
+                        _beamRenderer.SetPosition(1, new Vector3(_syncedBeamEndX, _syncedBeamEndY, _syncedBeamEndZ));
+                    }
+                    else
+                    {
+                        _beamRenderer.enabled = false;
+                    }
+                }
+                return;
+            }
+
             if (_triggerHeld)
             {
                 // Vérifier les munitions ; arrêter le beam si vide
@@ -615,16 +672,7 @@ namespace M2922.Component.Weapon
                                     if (beamReceiver != null)
                                     {
                                         beamReceiver.SendDamage(_beamDamageAccum, _weapon.DamageTypeAsInt, _localPlayer);
-
-                                        VRCPlayerApi targetOwner = Networking.GetOwner(beamReceiver.gameObject);
-                                        if (targetOwner != null && targetOwner != _localPlayer)
-                                        {
-                                            _relayedTargetID = targetOwner.playerId;
-                                            _relayedDamage = _beamDamageAccum;
-                                            _relayedDamageType = _weapon.DamageTypeAsInt;
-                                            _relaySequence = _relaySequence + 1;
-                                            RequestSerialization();
-                                        }
+                                        SendRelay(_beamDamageAccum, _weapon.DamageTypeAsInt, beamReceiver);
                                     }
                                 }
                             }
@@ -702,7 +750,11 @@ namespace M2922.Component.Weapon
                 {
                     var receiver = GetDamageReceiver(col);
                     if (receiver != null)
-                        receiver.SendDamage(_weapon.Impact * 2f, _weapon.DamageTypeAsInt, _localPlayer);
+                    {
+                        float dmg = _weapon.Impact * 2f;
+                        receiver.SendDamage(dmg, _weapon.DamageTypeAsInt, _localPlayer);
+                        SendRelay(dmg, _weapon.DamageTypeAsInt, receiver);
+                    }
                 }
             }
         }
@@ -782,19 +834,42 @@ namespace M2922.Component.Weapon
                 }
             }
 
-            // --- PLAYER DAMAGE RELAY : la cible applique les dégâts ---
-            if (_relaySequence != _lastRelaySequence)
+            // --- DAMAGE RELAY : la cible applique les dégâts ---
+            if (_relaySequence != _lastRelaySeq)
             {
-                _lastRelaySequence = _relaySequence;
+                _lastRelaySeq = _relaySequence;
 
-                int myID = Networking.LocalPlayer != null ? Networking.LocalPlayer.playerId : -1;
-                if (_relayedTargetID == myID)
+                float dmg = _relayDamage;
+                int dmgType = _relayDamageType;
+                int shooterId = _relayShooterId;
+                int targetId = _relayTargetId;
+                int entityId = _relayEntityId;
+                bool isNpc = _relayIsNpc;
+
+                _relayDamage = 0f;
+
+                int myId = Networking.LocalPlayer != null ? Networking.LocalPlayer.playerId : -1;
+                VRCPlayerApi shooter = shooterId >= 0 ? VRCPlayerApi.GetPlayerById(shooterId) : null;
+
+                // Skip si on est le tireur (déjà appliqué localement)
+                if (shooterId == myId) { /* skip */ }
+                else if (isNpc)
                 {
-                    var receiver = Manager != null
-                        ? Manager.GetReceiverByPlayerID(myID)
-                        : null;
-                    if (receiver != null)
-                        receiver.ApplyTypedDamage(_relayedDamage, _relayedDamageType, null);
+                    // NPC/destructible : tout le monde (sauf tireur) applique
+                    if (Manager != null)
+                    {
+                        var npc = Manager.GetNpcReceiverByEntityId(entityId);
+                        if (npc != null) npc.ApplyNetworkDamage(dmg, dmgType, shooter);
+                    }
+                }
+                else if (targetId == myId)
+                {
+                    // PvP : seul le joueur cible applique
+                    if (Manager != null)
+                    {
+                        var receiver = Manager.GetReceiverByPlayerID(targetId);
+                        if (receiver != null) receiver.ApplyNetworkDamage(dmg, dmgType, shooter);
+                    }
                 }
             }
 
@@ -826,6 +901,61 @@ namespace M2922.Component.Weapon
                     _beamRenderer.enabled = false;
                 }
             }
+        }
+
+        // ===================================================
+        // DAMAGE RELAY (écrit les [UdonSynced] vars du FireHandler)
+        // ===================================================
+
+        /// <summary>Relai réseau unifié. Appelé par hitscan, beam, melee, projectile.</summary>
+        private void SendRelay(float damage, int damageType, M2922_DamageReceiver receiver)
+        {
+            if (_localPlayer == null)
+            {
+                this.Warning("[FireHandler] SendRelay ignoré: _localPlayer est NULL (HandlePickup pas appelé?)");
+                return;
+            }
+            if (receiver == null) return;
+
+            // Déterminer la cible : utiliser Networking.GetOwner (fonctionne pour les
+            // Player Objects spawnés par VRC_SceneDescriptor, où chaque joueur est
+            // owner de sa propre copie).
+            VRCPlayerApi targetOwner = Networking.GetOwner(receiver.gameObject);
+            if (targetOwner != null && targetOwner != _localPlayer)
+            {
+                // PvP : le propriétaire du Player Object est un autre joueur
+                _relayTargetId = targetOwner.playerId;
+                _relayIsNpc = false;
+                _relayEntityId = -1;
+            }
+            else if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
+            {
+                // NPC/destructible (identifié via l'entityId du HitboxSystem)
+                _relayTargetId = -1;
+                _relayIsNpc = true;
+                _relayEntityId = receiver.HitboxSystem.EntityId;
+            }
+            else
+            {
+                // Impossible d'identifier la cible → pas de relai
+                this.Warning("[FireHandler] SendRelay ignoré: cible non identifiable (pas de owner, pas d'entityId)");
+                return;
+            }
+
+            _relayShooterId = _localPlayer.playerId;
+
+            // Reset l'accumulateur au début de chaque frame (le propriétaire
+            // ne recoit PAS OnDeserialization, donc _relayDamage ne serait
+            // jamais réinitialisé sans ça → bug des dégâts ×10+)
+            if (_relayFrame != Time.frameCount)
+            {
+                _relayFrame = Time.frameCount;
+                _relayDamage = 0f;
+            }
+            _relayDamage = _relayDamage + damage;
+            _relayDamageType = damageType;
+            _relaySequence = _relaySequence + 1;
+            RequestSerialization();
         }
 
         // ===================================================
@@ -875,19 +1005,44 @@ namespace M2922.Component.Weapon
             var receiver = GetDamageReceiver(hit.collider);
             if (receiver == null) return;
 
-            // Appliquer localement (tireur voit les dégâts)
+            // Appliquer localement
             receiver.SendDamage(finalDmg, _weapon.DamageTypeAsInt, _localPlayer);
 
-            // Relai réseau pour les cibles JOUEUR (dont on ne peut pas prendre l'ownership)
-            VRCPlayerApi targetOwner = Networking.GetOwner(receiver.gameObject);
-            if (targetOwner != null && targetOwner != _localPlayer)
+            // Relai réseau
+            SendRelay(finalDmg, _weapon.DamageTypeAsInt, receiver);
+        }
+
+        /// <summary>
+        /// Relaie des dégâts vers un joueur/NPC distant.
+        /// Appelé par les projectiles (roquettes, GL) qui n'ont pas de sync eux-mêmes.
+        /// </summary>
+        public void RelayDamage(float damage, int damageType, M2922_DamageReceiver receiver)
+        {
+            SendRelay(damage, damageType, receiver);
+        }
+
+        /// <summary>
+        /// Ajoute un relay à la file batch (pour les projectiles qui touchent
+        /// plusieurs cibles en une frame : splash damage). Les relays batch
+        /// sont envoyés un par frame pour éviter l'écrasement des vars [UdonSynced].
+        /// </summary>
+        public void RelayDamageBatch(float damage, int damageType, M2922_DamageReceiver receiver)
+        {
+            if (receiver == null || _batchCount >= 16) return;
+
+            // Déduplication : additionner si déjà dans le batch
+            for (int i = 0; i < _batchCount; i++)
             {
-                _relayedTargetID = targetOwner.playerId;
-                _relayedDamage = finalDmg;
-                _relayedDamageType = _weapon.DamageTypeAsInt;
-                _relaySequence = _relaySequence + 1;
-                RequestSerialization();
+                if (_batchReceivers[i] == receiver)
+                {
+                    _batchDamages[i] = _batchDamages[i] + damage;
+                    return;
+                }
             }
+
+            _batchReceivers[_batchCount] = receiver;
+            _batchDamages[_batchCount] = damage;
+            _batchCount++;
         }
 
         private float ComputeDamage(float distance, float maxRange)

@@ -56,6 +56,14 @@ namespace M2922.Component.Health
         {
             _isDead = true;
             _deathTime = Time.time;
+
+            // Drop tous les VRC Pickup tenus
+            DropAllPickups();
+
+            // TP au point de respawn
+            if (_respawnPoint != null)
+                transform.SetPositionAndRotation(_respawnPoint.position, _respawnPoint.rotation);
+
             this.Log("Entity died.");
             // TODO: trigger OnDeath event, ragdoll, disable colliders...
         }
@@ -67,13 +75,6 @@ namespace M2922.Component.Health
             // Restaurer vie et shield
             if (_health != null) _health.Revive();
             if (_shield != null) _shield.Revive();
-
-            // Drop tous les VRC Pickup tenus
-            DropAllPickups();
-
-            // TP au point de respawn
-            if (_respawnPoint != null)
-                transform.SetPositionAndRotation(_respawnPoint.position, _respawnPoint.rotation);
 
             this.Log("Entity respawned.");
         }

@@ -76,6 +76,8 @@ namespace M2922.Component.UI
         private M2922_ShieldComponent _shield;
         private float _displayedHP = 1f;
         private float _displayedShield = 1f;
+        private float _retryTimer = 0f;
+        private const float RETRY_INTERVAL = 2f; // retenter toutes les 2 secondes si pas trouvé
 
         // ============================================================
         // LIFECYCLE
@@ -91,7 +93,18 @@ namespace M2922.Component.UI
         {
             base.Update();
 
-            if (_health == null) return;
+            // Retry auto-détection si le DamageReceiver n'a pas été trouvé au Start()
+            // (le Manager.RegisterReceiver peut arriver après le Start, via le polling bind)
+            if (_health == null || _damageReceiver == null)
+            {
+                _retryTimer += Time.deltaTime;
+                if (_retryTimer >= RETRY_INTERVAL)
+                {
+                    _retryTimer = 0f;
+                    ResolveReferences();
+                }
+                return;
+            }
 
             float hpMax = _health.MaxHP;
             float hpCur = _health.CurrentHP;

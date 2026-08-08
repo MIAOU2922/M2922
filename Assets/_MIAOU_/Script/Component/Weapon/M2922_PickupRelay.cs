@@ -7,17 +7,19 @@ namespace M2922.Component.Weapon
 {
     /// <summary>
     /// Relay pickup events du parent (VRC Pickup + VRC Object Sync)
-    /// vers le M2922_WeaponFireHandler situé sur un enfant.
+    /// vers le M2922_WeaponFireHandler situé sur l'enfant "Logic".
     /// 
-    /// À placer sur le même GameObject que le VRC Pickup.
-    /// Sync mode = None (pas de conflit avec VRC Object Sync).
+    /// Placé sur le même GameObject que le VRC Pickup.
+    /// Sync mode = None : pas de conflit avec VRC Object Sync sur le même GO.
+    /// Le relai de dégâts réseau est géré directement par le FireHandler
+    /// (sur l'enfant "Logic" avec VRCObjectSync, ownership transféré au porteur).
     /// </summary>
     [AddComponentMenu("M2922/Weapon/Pickup Relay")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class M2922_PickupRelay : M2922_Base
     {
         [Header("=== TARGET ===")]
-        [Tooltip("FireHandler de l'arme (sur un enfant).")]
+        [Tooltip("FireHandler de l'arme (sur l'enfant Logic).")]
         [SerializeField] private M2922_WeaponFireHandler _fireHandler;
 
         protected override void Start()

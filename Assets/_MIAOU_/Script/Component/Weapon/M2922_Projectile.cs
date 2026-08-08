@@ -284,7 +284,14 @@ namespace M2922.Component.Weapon
                     }
                 }
                 if (receiver != null)
-                    receiver.SendDamage(_directDamage * zoneMult, _damageType, _owner);
+                {
+                    float dmg = _directDamage * zoneMult;
+                    receiver.SendDamage(dmg, _damageType, _owner);
+
+                    // Ajouter au batch (sera envoyé 1 par frame avec les cibles splash)
+                    if (_pool != null)
+                        _pool.RelayDamageBatch(dmg, _damageType, receiver);
+                }
             }
 
             // Exploser au contact de n'importe quoi (hitbox, sol, mur...)
@@ -352,7 +359,12 @@ namespace M2922.Component.Weapon
                         damaged[damagedCount] = receiver;
                         damagedCount++;
                     }
-                    receiver.SendDamage(dmg * zoneMult, _damageType, _owner);
+                    float splashDmg = dmg * zoneMult;
+                    receiver.SendDamage(splashDmg, _damageType, _owner);
+
+                    // Ajouter au batch pour envoi échelonné (1 cible par frame)
+                    if (_pool != null)
+                        _pool.RelayDamageBatch(splashDmg, _damageType, receiver);
                 }
             }
 

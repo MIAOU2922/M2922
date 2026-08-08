@@ -25,6 +25,10 @@ namespace M2922.Core
         private M2922.Component.Health.M2922_DamageReceiver[] _registeredReceivers = new M2922.Component.Health.M2922_DamageReceiver[80];
         private int _registryCount = 0;
 
+        [Header("=== NPC REGISTRY ===")]
+        private M2922.Component.Health.M2922_DamageReceiver[] _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[200];
+        private int _npcCount = 0;
+
         // === METHODE ===
         protected override void Start()
         {
@@ -114,6 +118,26 @@ namespace M2922.Core
                     return _registeredReceivers[i];
             }
             return null;
+        }
+
+        // ===================================================
+        // NPC REGISTRY (pour le relai de dégâts réseau)
+        // ===================================================
+
+        /// <summary>Enregistre un NPC/destructible et retourne son entityId.</summary>
+        public int RegisterNpc(M2922.Component.Health.M2922_DamageReceiver receiver)
+        {
+            if (_npcCount >= 200) return -1;
+            int id = _npcCount;
+            _npcReceivers[_npcCount] = receiver;
+            _npcCount++;
+            return id;
+        }
+
+        public M2922.Component.Health.M2922_DamageReceiver GetNpcReceiverByEntityId(int entityId)
+        {
+            if (entityId < 0 || entityId >= _npcCount) return null;
+            return _npcReceivers[entityId];
         }
     }
 }

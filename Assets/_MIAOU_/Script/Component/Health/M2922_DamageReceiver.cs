@@ -18,6 +18,7 @@ namespace M2922.Component.Health
         [SerializeField] private M2922_ShieldComponent _shield;
         [SerializeField] private M2922_ArmorComponent _armor;
         [SerializeField] private M2922_HealthComponent _health;
+        [SerializeField] private M2922_HitboxSystem _hitboxSystem;
 
         [Header("=== MODIFIERS ===")]
         [SerializeField] private M2922_ModifierContainer _modifierContainer;
@@ -25,23 +26,17 @@ namespace M2922.Component.Health
         [Header("=== DAMAGE MULTIPLIERS ===")]
         [SerializeField] private float _globalMultiplier = 1f;
 
-        // ===================================================
-        // NETWORK DAMAGE (tireur → cible)
-        // ===================================================
-        [Header("=== NETWORK DAMAGE ===")]
-        [UdonSynced] private float _syncedDamage = 0f;
-        [UdonSynced] private int _syncedDamageType = 0;
-        [UdonSynced] private int _syncedSourceID = -1;
-        [UdonSynced] private bool _hasPendingDamage = false;
+        /// <summary>HitboxSystem de cette entité (pour l'identification réseau).</summary>
+        public M2922_HitboxSystem HitboxSystem => _hitboxSystem;
 
         protected override void Start()
         {
             base.Start();
 
-            // S'enregistrer auprès du Manager si on est sur un joueur
-            VRCPlayerApi owner = Networking.GetOwner(gameObject);
-            if (owner != null && owner.isLocal && Manager != null)
-                Manager.RegisterReceiver(owner.playerId, this);
+            // S'enregistrer auprès du Manager via le HitboxSystem (pas via l'ownership réseau,
+            // car le premier joueur qui rejoint est propriétaire de tous les objets de scène).
+            if (_hitboxSystem != null && _hitboxSystem.BoundPlayerId >= 0 && Manager != null)
+                Manager.RegisterReceiver(_hitboxSystem.BoundPlayerId, this);
         }
 
         protected override void AutoDetectReferences()
@@ -49,6 +44,7 @@ namespace M2922.Component.Health
             if (_shield  == null) _shield  = GetComponent<M2922_ShieldComponent>();
             if (_armor   == null) _armor   = GetComponent<M2922_ArmorComponent>();
             if (_health  == null) _health  = GetComponent<M2922_HealthComponent>();
+            if (_hitboxSystem == null) _hitboxSystem = GetComponent<M2922_HitboxSystem>();
             if (_modifierContainer == null) _modifierContainer = GetComponent<M2922_ModifierContainer>();
         }
 
@@ -147,67 +143,49 @@ namespace M2922.Component.Health
         }
 
         // ===================================================
-        // NETWORK DAMAGE
+        // DAMAGE APPLICATION
         // ===================================================
 
         /// <summary>
-        /// Appelé par le TIREUR pour transmettre les dégâts en réseau.
-        /// Prend brièvement ownership, écrit les variables synced,
-        /// et la cible les applique dans OnDeserialization().
+        /// Applique les dégâts LOCALEMENT. Appelé par le tireur (hitscan, projectile, beam).
+        /// Le relai réseau est géré par le PickupRelay de l'arme du tireur.
         /// </summary>
         public void SendDamage(float damage, int damageType, VRCPlayerApi source)
         {
-            // TOUJOURS appliquer localement d'abord
             ApplyTypedDamage(damage, damageType, source);
-
-            // Accumuler pour le réseau (plusieurs hits en 1 frame = shotgun, beam, etc.)
-            _syncedDamage = _syncedDamage + damage;
-            _syncedDamageType = damageType;
-            _syncedSourceID = source != null ? source.playerId : -1;
-            _hasPendingDamage = true;
-
-            if (Networking.LocalPlayer == null) return;
-
-            if (!Networking.IsOwner(gameObject))
-                Networking.SetOwner(Networking.LocalPlayer, gameObject);
-
-            RequestSerialization();
         }
 
-        public override void OnDeserialization()
+        /// <summary>
+        /// Applique les dégâts reçus via le réseau (relai PickupRelay).
+        /// Appelé depuis PickupRelay.OnDeserialization() sur le client de la cible.
+        /// On ne vérifie PAS l'ownership — le relai est déjà filtré par le PickupRelay.
+        /// </summary>
+        public void ApplyNetworkDamage(float damage, int damageType, VRCPlayerApi source)
         {
-            if (_hasPendingDamage)
-            {
-                float dmg = _syncedDamage;
-                int type = _syncedDamageType;
-                int srcID = _syncedSourceID;
-
-                _hasPendingDamage = false;
-                _syncedDamage = 0f;
-
-                // Skip si on est le tireur (déjà appliqué localement)
-                if (Networking.LocalPlayer != null && Networking.LocalPlayer.playerId == srcID)
-                    return;
-
-                // Ré-assert ownership pour que le HealthComponent
-                // puisse sync ses propres HP ensuite
-                if (!Networking.IsOwner(gameObject))
-                    Networking.SetOwner(Networking.LocalPlayer, gameObject);
-
-                VRCPlayerApi source = srcID >= 0 ? VRCPlayerApi.GetPlayerById(srcID) : null;
-                ApplyTypedDamage(dmg, type, source);
-            }
+            ApplyTypedDamage(damage, damageType, source);
         }
+
+        // NOTE: OnDeserialization() n'est plus utilisé pour le relai de dégâts.
+        // Le relai est maintenant géré par M2922_PickupRelay (sur le root des armes).
+        // Les HP/Shield sont synchronisés par HealthComponent/ShieldComponent
+        // via leur ShouldSync() → IsNetworkingAuthority().
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
         protected override M2922_GizmoDisplayInfo[] GetGizmoValues()
         {
             bool invincible = _modifierContainer != null && _modifierContainer.HasModifier(ModifierType.Invincibility);
+            string hitboxStr = _hitboxSystem != null
+                ? (_hitboxSystem.BoundPlayerId >= 0 ? $"Player {_hitboxSystem.BoundPlayerId}" : "NPC/World")
+                : "Missing";
+            Color hitboxColor = _hitboxSystem != null
+                ? (_hitboxSystem.BoundPlayerId >= 0 ? Color.green : Color.grey)
+                : Color.red;
             return new M2922_GizmoDisplayInfo[]
             {
                 new M2922_GizmoDisplayInfo("Shield", _shield != null ? "ON" : "OFF", _shield != null ? Color.cyan : Color.gray),
                 new M2922_GizmoDisplayInfo("Armor", _armor != null ? "ON" : "OFF", _armor != null ? Color.cyan : Color.gray),
                 new M2922_GizmoDisplayInfo("Health", _health != null ? "ON" : "OFF", _health != null ? Color.green : Color.gray),
+                new M2922_GizmoDisplayInfo("HitboxSys", hitboxStr, hitboxColor),
                 new M2922_GizmoDisplayInfo("Modifiers", _modifierContainer != null ? "Linked" : "None", _modifierContainer != null ? Color.green : Color.gray),
                 new M2922_GizmoDisplayInfo("Invincible", invincible ? "YES" : "NO", invincible ? Color.red : Color.gray),
             };
