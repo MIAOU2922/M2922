@@ -859,7 +859,18 @@ namespace M2922.Component.Weapon
                     if (Manager != null)
                     {
                         var npc = Manager.GetNpcReceiverByEntityId(entityId);
-                        if (npc != null) npc.ApplyNetworkDamage(dmg, dmgType, shooter);
+                        if (npc != null)
+                        {
+                            npc.ApplyNetworkDamage(dmg, dmgType, shooter);
+                        }
+                        else if (targetId == myId)
+                        {
+                            // Fallback PvP : le hitbox était enregistré comme NPC mais
+                            // le entityId ne correspond pas (ex: hitbox du master sur
+                            // un client distant). On utilise le targetId de l'owner.
+                            var receiver = Manager.GetReceiverByPlayerID(targetId);
+                            if (receiver != null) receiver.ApplyNetworkDamage(dmg, dmgType, shooter);
+                        }
                     }
                 }
                 else if (targetId == myId)
@@ -917,23 +928,27 @@ namespace M2922.Component.Weapon
             }
             if (receiver == null) return;
 
-            // 1. NPC/destructible (identifié par le HitboxSystem.EntityId)
-            //    Prioritaire sur Networking.GetOwner car les objets de scène
-            //    appartiennent TOUS au master, mais ne sont PAS des Player Objects.
-            if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
-            {
-                _relayTargetId = -1;
-                _relayIsNpc = true;
-                _relayEntityId = receiver.HitboxSystem.EntityId;
-            }
-            // 2. Player Object lié (BoundPlayerId >= 0)
-            else if (receiver.HitboxSystem != null && receiver.HitboxSystem.BoundPlayerId >= 0)
+            // 1. Player Object lié (BoundPlayerId >= 0) — PRIORITAIRE
+            //    Doit être vérifié AVANT EntityId car les hitboxes de joueurs
+            //    distants peuvent recevoir un EntityId incorrect via _PollAutoBind
+            //    timeout → cela les ferait passer par le chemin NPC et casser le PvP.
+            if (receiver.HitboxSystem != null && receiver.HitboxSystem.BoundPlayerId >= 0)
             {
                 int boundId = receiver.HitboxSystem.BoundPlayerId;
                 if (boundId == _localPlayer.playerId) return; // pas de relai sur soi-même
                 _relayTargetId = boundId;
                 _relayIsNpc = false;
                 _relayEntityId = -1;
+            }
+            // 2. NPC/destructible (identifié par le HitboxSystem.EntityId)
+            //    On stocke aussi _relayTargetId depuis l'owner pour le fallback PvP
+            //    (cas du master dont le hitbox est incorrectement enregistré comme NPC).
+            else if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
+            {
+                VRCPlayerApi npcOwner = Networking.GetOwner(receiver.gameObject);
+                _relayTargetId = (npcOwner != null) ? npcOwner.playerId : -1;
+                _relayIsNpc = true;
+                _relayEntityId = receiver.HitboxSystem.EntityId;
             }
             // 3. Fallback : utiliser Networking.GetOwner (dernier recours)
             else

@@ -5,6 +5,19 @@ using M2922.Core;
 
 namespace M2922.Component.Health
 {
+    /// <summary>
+    /// Contrôle la visibilité des meshes debug hitbox.
+    /// - ShowAll   : toujours visibles (debug global)
+    /// - HideLocal : cachés si le GameObject appartient au joueur local (soi-même)
+    /// - HideAll   : toujours cachés
+    /// </summary>
+    public enum HitboxDebugVisibility
+    {
+        ShowAll,
+        HideLocal,
+        HideAll
+    }
+
     [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
     [AddComponentMenu("M2922/Debug/Hitbox Debug Visualizer")]
     public class M2922_HitboxDebugVisualizer : M2922_Base
@@ -21,6 +34,17 @@ namespace M2922.Component.Health
         [SerializeField] private Material _normalMaterial;
         [SerializeField] private Material _critMaterial;
 
+        [Header("=== VISIBILITY ===")]
+        [Tooltip("ShowAll = toujours visible | HideLocal = caché si le GO nous appartient | HideAll = toujours caché")]
+        [SerializeField] private HitboxDebugVisibility _visibilityMode = HitboxDebugVisibility.ShowAll;
+
+        /// <summary>Mode de visibilité des meshes debug. Modifiable runtime.</summary>
+        public HitboxDebugVisibility VisibilityMode
+        {
+            get => _visibilityMode;
+            set { _visibilityMode = value; ApplyVisibility(); }
+        }
+
         private GameObject[] _created = new GameObject[0];
         private Collider[] _createdParents = new Collider[0];
         private int _createdCount = 0;
@@ -30,7 +54,22 @@ namespace M2922.Component.Health
             base.Start();
             if (_hitboxSystem == null)
                 _hitboxSystem = GetComponent<M2922_HitboxSystem>();
+
+            // Rebuild immédiat — HitboxCount lit le tableau sérialisé donc il est
+            // déjà disponible (ne dépend plus du Start() de HitboxSystem).
             Rebuild();
+
+            // Filet de sécurité : si les prefabs n'étaient pas encore assignés
+            // (scène chargée dynamiquement), on réessaie dans 2 frames.
+            if (_createdCount == 0)
+                SendCustomEventDelayedFrames("_DelayedRebuild", 2);
+        }
+
+        /// <summary>Rebuild différé (filet de sécurité).</summary>
+        public void _DelayedRebuild()
+        {
+            if (_createdCount == 0)
+                Rebuild();
         }
 
         private void OnDestroy() { ClearAll(); }
@@ -38,23 +77,44 @@ namespace M2922.Component.Health
 
         private void LateUpdate()
         {
+            bool shouldShow = ComputeShouldShow();
             for (int i = 0; i < _createdCount; i++)
             {
                 GameObject vis = _created[i];
                 Collider parentCol = _createdParents[i];
                 if (vis == null || parentCol == null) continue;
                 ApplyScale(vis.transform, parentCol);
+
+                // Synchroniser la visibilité dynamiquement (l'ownership peut changer)
+                MeshRenderer mr = vis.GetComponent<MeshRenderer>();
+                if (mr != null && mr.enabled != shouldShow)
+                    mr.enabled = shouldShow;
             }
         }
 
         public void Rebuild()
         {
             ClearAll();
-            if (_hitboxSystem == null) return;
+            if (_hitboxSystem == null)
+            {
+                Debug.LogWarning("[HitboxDebugVisualizer] _hitboxSystem est null, Rebuild annulé.", this);
+                return;
+            }
 
             Collider[] cols = _hitboxSystem.HitboxColliders;
             int count = _hitboxSystem.HitboxCount;
-            if (cols == null || count == 0) return;
+            if (cols == null || count == 0)
+            {
+                Debug.LogWarning($"[HitboxDebugVisualizer] Aucun collider dans HitboxSystem (cols={cols != null}, count={count}), Rebuild annulé.", this);
+                return;
+            }
+
+            // Vérification rapide des prefabs obligatoires
+            if (_cubePrefab == null)
+            {
+                Debug.LogError("[HitboxDebugVisualizer] _cubePrefab n'est pas assigné ! Les objets debug ne peuvent pas être créés.", this);
+                return;
+            }
 
             _created = new GameObject[count];
             _createdParents = new Collider[count];
@@ -67,7 +127,11 @@ namespace M2922.Component.Health
 
                 bool crit = col.GetComponent<M2922_DamageMultiplier>() != null;
                 Material mat = crit ? _critMaterial : _normalMaterial;
-                if (mat == null) continue;
+                if (mat == null)
+                {
+                    Debug.LogWarning($"[HitboxDebugVisualizer] Matériel manquant (crit={crit}), hitbox {i} ignorée.", this);
+                    continue;
+                }
 
                 // Choisir le prefab selon le type de collider
                 GameObject prefab = _cubePrefab;
@@ -75,7 +139,11 @@ namespace M2922.Component.Health
                     prefab = _spherePrefab;
                 else if (col.GetComponent<CapsuleCollider>() != null)
                     prefab = _capsulePrefab;
-                if (prefab == null) continue;
+                if (prefab == null)
+                {
+                    Debug.LogWarning($"[HitboxDebugVisualizer] Prefab manquant pour le type de collider {col.GetType().Name}, hitbox {i} ignorée.", this);
+                    continue;
+                }
 
                 GameObject vis = Instantiate(prefab);
                 vis.name = "[DEBUG_HITBOX] " + i + "_" + col.name;
@@ -86,6 +154,44 @@ namespace M2922.Component.Health
                 _created[_createdCount] = vis;
                 _createdParents[_createdCount] = col;
                 _createdCount++;
+            }
+
+            // Appliquer la visibilité initiale
+            ApplyVisibility();
+
+            Debug.Log($"[HitboxDebugVisualizer] {_createdCount}/{count} hitbox(es) visualisées.", this);
+        }
+
+        /// <summary>
+        /// Calcule si les meshes doivent être visibles selon le mode actuel
+        /// et l'ownership réseau du GameObject.
+        /// </summary>
+        private bool ComputeShouldShow()
+        {
+            switch (_visibilityMode)
+            {
+                case HitboxDebugVisibility.ShowAll:
+                    return true;
+                case HitboxDebugVisibility.HideLocal:
+                    // Caché si le GO appartient au joueur local (soi-même)
+                    VRCPlayerApi owner = Networking.GetOwner(gameObject);
+                    return owner == null || !owner.isLocal;
+                case HitboxDebugVisibility.HideAll:
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>Applique la visibilité à tous les meshes créés.</summary>
+        private void ApplyVisibility()
+        {
+            bool shouldShow = ComputeShouldShow();
+            for (int i = 0; i < _createdCount; i++)
+            {
+                GameObject vis = _created[i];
+                if (vis == null) continue;
+                MeshRenderer mr = vis.GetComponent<MeshRenderer>();
+                if (mr != null) mr.enabled = shouldShow;
             }
         }
 

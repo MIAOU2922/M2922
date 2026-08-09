@@ -44,7 +44,12 @@ namespace M2922.Component.Health
 
         private int _hitboxCount;
 
-        public int HitboxCount => _hitboxCount;
+        /// <summary>
+        /// Nombre de colliders hitbox. Lit directement le tableau sérialisé
+        /// pour être disponible même avant le Start() du HitboxSystem (ordre
+        /// d'exécution non déterministe entre composants sur le même GameObject).
+        /// </summary>
+        public int HitboxCount => _hitboxColliders != null ? _hitboxColliders.Length : 0;
         public Collider[] HitboxColliders => _hitboxColliders;
         public int BoundPlayerId => _boundPlayerId;
         public int EntityId => _entityId;
@@ -81,7 +86,8 @@ namespace M2922.Component.Health
         /// <summary>True si le collider appartient aux hitboxes de cette entité.</summary>
         public bool IsMyCollider(Collider col)
         {
-            for (int i = 0; i < _hitboxCount; i++)
+            if (_hitboxColliders == null) return false;
+            for (int i = 0; i < _hitboxColliders.Length; i++)
                 if (_hitboxColliders[i] == col) return true;
             return false;
         }
@@ -146,9 +152,22 @@ namespace M2922.Component.Health
             }
             else
             {
-                // Échec après N tentatives → enregistrer comme NPC (fallback)
-                this.Warning($"[HitboxSystem] Échec auto-bind après {_bindAttempts} tentatives. Enregistrement comme NPC.");
-                RegisterAsNpc();
+                // Distinguer un hitbox de joueur distant (owned par un joueur non-master)
+                // d'un vrai NPC/destructible (objet de scène owned par le master).
+                // Sans cette distinction, les hitboxes des joueurs distants sont
+                // incorrectement enregistrés comme NPCs → le relay PvP casse.
+                owner = Networking.GetOwner(gameObject);
+                if (owner != null && !owner.isMaster)
+                {
+                    BindToPlayer(owner.playerId);
+                    this.Log($"[HitboxSystem] Remote bind to playerId={owner.playerId} after {_bindAttempts} attempts");
+                }
+                else
+                {
+                    // Échec après N tentatives → enregistrer comme NPC (fallback)
+                    this.Warning($"[HitboxSystem] Échec auto-bind après {_bindAttempts} tentatives. Enregistrement comme NPC.");
+                    RegisterAsNpc();
+                }
             }
         }
 

@@ -1,5 +1,6 @@
 for rp project :
-    - hitbox system (finish)
+    - hitbox system ( in progress)
+        - fix avatar armature have random rotation
     - weapon system ( in progress)
         - all type off weapon
         - raycast / projectiles
