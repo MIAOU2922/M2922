@@ -3,7 +3,6 @@ using UnityEngine;
 using VRC.SDKBase;
 using M2922.Core;
 using M2922.Component.Health;
-using M2922.Component.Weapon;
 
 namespace M2922.Component.Utils
 {
@@ -47,10 +46,15 @@ namespace M2922.Component.Utils
         // FILTRES PAR TYPE
         // =====================================================================
         [Header("=== FILTRES PAR TYPE ===")]
+        [Tooltip("Joueurs (OnPlayerTriggerEnter + Interact).")]
         [SerializeField] protected bool _allowPlayers = true;
+        [Tooltip("Entités avec M2922_TeleportMarker (NPC).")]
         [SerializeField] protected bool _allowNPCs = true;
-        [SerializeField] protected bool _allowWeapons = true;
-        [SerializeField] protected bool _allowProjectiles = false;
+        [Tooltip("Entités avec M2922_TeleportMarker (Vehicle).")]
+        [SerializeField] protected bool _allowVehicles = true;
+        [Tooltip("Entités avec M2922_TeleportMarker (Object).")]
+        [SerializeField] protected bool _allowObjects = true;
+        [Tooltip("Rigidbodies SANS M2922_TeleportMarker (catch-all).")]
         [SerializeField] protected bool _allowPhysicsObjects = true;
 
         // =====================================================================
@@ -65,7 +69,7 @@ namespace M2922.Component.Utils
         [Tooltip("Si coché : reset la vélocité du Rigidbody de l'entité après téléportation.\n" +
                  "Évite la dérive des objets physiques (cube qui tombe en boucle).")]
         [SerializeField] protected bool  _resetVelocityOnTeleport = false;
-        [Tooltip("Rayon (mètres) autour d'une entité avec M2922_TeleportRiderMarker. 0 = désactivé.")]
+        [Tooltip("Rayon (mètres) autour d'une entité avec M2922_TeleportMarker. 0 = désactivé.")]
         [SerializeField] protected float _riderTeleportRadius = 3f;
 
         // =====================================================================
@@ -97,41 +101,7 @@ namespace M2922.Component.Utils
         public bool                 IsEnabled      => _isEnabled;
         public TeleporterActivation ActivationMode => _activationMode;
         public bool                 HasDestination => GetDestination() != null;
-        public bool                 AllowProjectiles => _allowProjectiles;
 
-        /// <summary>
-        /// Calcule l'origine et la direction de sortie pour un rayon entrant dans ce TP.
-        /// Si _alignRotation est actif, la direction est pivotée selon l'orientation
-        /// relative entre le TP d'entrée et sa destination (comportement portal).
-        /// Sinon, seule la position change, la direction reste identique.
-        /// Retourne false si pas de destination.
-        /// </summary>
-        public bool ComputeExitRay(Vector3 entryPoint, Vector3 entryDir,
-            out Vector3 exitPoint, out Vector3 exitDir)
-        {
-            exitPoint = entryPoint;
-            exitDir = entryDir;
-            Transform dest = GetDestination();
-            if (dest == null) return false;
-
-            // Transformer la position d'entrée en espace local du TP
-            Vector3 localPoint = transform.InverseTransformPoint(entryPoint);
-
-            if (_alignRotation)
-            {
-                // Portal complet : position + direction pivotées
-                Vector3 localDir = transform.InverseTransformDirection(entryDir);
-                exitPoint = dest.TransformPoint(localPoint);
-                exitDir = dest.TransformDirection(localDir);
-            }
-            else
-            {
-                // Translation seule : direction conservée
-                exitPoint = dest.TransformPoint(localPoint);
-                exitDir = entryDir;
-            }
-            return true;
-        }
 
         // =====================================================================
         // PUBLIC API
@@ -191,51 +161,39 @@ namespace M2922.Component.Utils
             M2922_HitboxSystem hitbox = other.GetComponentInParent<M2922_HitboxSystem>();
             if (hitbox != null && hitbox.BoundPlayerId >= 0) return;
 
-            // ── 2. NPC ──────────────────────────────────────────────────
-            M2922_DamageReceiver receiver = other.GetComponentInParent<M2922_DamageReceiver>();
-            if (receiver != null)
+            // ── 2. MARKER → téléportation typée ─────────────────────────
+            M2922_TeleportMarker marker = other.GetComponentInParent<M2922_TeleportMarker>();
+            if (marker != null)
             {
-                if (!_allowNPCs) { this.VerboseLog("[Teleporter] NPC rejeté (filtre)"); return; }
-                if (!Networking.IsOwner(receiver.gameObject)) { this.VerboseLog("[Teleporter] NPC rejeté (pas owner)"); return; }
-                bool isRider = other.GetComponentInParent<M2922_TeleportRiderMarker>() != null;
-                this.VerboseLog($"[Teleporter] NPC détecté → {receiver.name}");
-                TryTeleportEntity(receiver.transform, "NPC", isRider);
+                switch (marker.EntityType)
+                {
+                    case TeleportEntityType.NPC:
+                        if (!_allowNPCs) { this.VerboseLog("[Teleporter] NPC rejeté (filtre)"); return; }
+                        break;
+                    case TeleportEntityType.Vehicle:
+                        if (!_allowVehicles) { this.VerboseLog("[Teleporter] Vehicle rejeté (filtre)"); return; }
+                        break;
+                    case TeleportEntityType.Physics:
+                        if (!_allowPhysicsObjects) { this.VerboseLog("[Teleporter] Physique rejeté (filtre)"); return; }
+                        break;
+                    case TeleportEntityType.Object:
+                        if (!_allowObjects) { this.VerboseLog("[Teleporter] Object rejeté (filtre)"); return; }
+                        break;
+                }
+                if (!Networking.IsOwner(marker.gameObject)) { this.VerboseLog("[Teleporter] Entité rejetée (pas owner)"); return; }
+                this.VerboseLog($"[Teleporter] {marker.EntityType} détecté → {marker.name}");
+                TryTeleportEntity(marker.transform, marker.EntityType.ToString(), isRiderCapable: true);
                 return;
             }
 
-            // ── 3. ARME ─────────────────────────────────────────────────
-            M2922_Weapon weapon = other.GetComponentInParent<M2922_Weapon>();
-            if (weapon != null)
-            {
-                if (!_allowWeapons) { this.VerboseLog("[Teleporter] Arme rejetée (filtre)"); return; }
-                if (!Networking.IsOwner(weapon.gameObject)) { this.VerboseLog("[Teleporter] Arme rejetée (pas owner)"); return; }
-                bool isRider = other.GetComponentInParent<M2922_TeleportRiderMarker>() != null;
-                this.VerboseLog($"[Teleporter] Arme détectée → {weapon.name}");
-                TryTeleportEntity(weapon.transform, "Weapon", isRider);
-                return;
-            }
-
-            // ── 4. PROJECTILE ───────────────────────────────────────────
-            M2922_Projectile projectile = other.GetComponentInParent<M2922_Projectile>();
-            if (projectile != null)
-            {
-                if (!_allowProjectiles) { this.VerboseLog("[Teleporter] Projectile rejeté (filtre)"); return; }
-                if (!Networking.IsOwner(projectile.gameObject)) { this.VerboseLog("[Teleporter] Projectile rejeté (pas owner)"); return; }
-                bool isRider = other.GetComponentInParent<M2922_TeleportRiderMarker>() != null;
-                this.VerboseLog($"[Teleporter] Projectile détecté → {projectile.name}");
-                TryTeleportEntity(projectile.transform, "Projectile", isRider);
-                return;
-            }
-
-            // ── 5. PHYSIQUE GÉNÉRIQUE ───────────────────────────────────
+            // ── 3. PHYSIQUE GÉNÉRIQUE (sans marker) ────────────────────
             Rigidbody rb = other.attachedRigidbody;
             if (rb != null)
             {
                 if (!_allowPhysicsObjects) { this.VerboseLog("[Teleporter] Physique rejeté (filtre)"); return; }
                 if (!Networking.IsOwner(rb.gameObject)) { this.VerboseLog("[Teleporter] Physique rejeté (pas owner)"); return; }
-                bool isRider = other.GetComponentInParent<M2922_TeleportRiderMarker>() != null;
-                this.VerboseLog($"[Teleporter] Objet physique détecté → {rb.name}");
-                TryTeleportEntity(rb.transform, "Physics", isRider);
+                this.VerboseLog($"[Teleporter] Objet physique générique détecté → {rb.name}");
+                TryTeleportEntity(rb.transform, "Physics", isRiderCapable: false);
             }
         }
 
@@ -374,18 +332,6 @@ namespace M2922.Component.Utils
                 _pendingEntityTransform.SetPositionAndRotation(arrivalPos, targetRot);
             }
 
-            // Si _alignRotation, pivoter la vélocité interne du projectile
-            // pour conserver le mouvement relatif (portal).
-            if (_alignRotation && !_resetVelocityOnTeleport)
-            {
-                M2922_Projectile proj = _pendingEntityTransform.GetComponent<M2922_Projectile>();
-                if (proj != null)
-                {
-                    Quaternion deltaRot = _pendingDestination.rotation * Quaternion.Inverse(transform.rotation);
-                    proj.RotateVelocity(deltaRot);
-                }
-            }
-
             _pendingEntityTransform = null;
 
             if (_pendingPlayer != null && Utilities.IsValid(_pendingPlayer))
@@ -468,8 +414,8 @@ namespace M2922.Component.Utils
                 new M2922_GizmoDisplayInfo("Mode",        _activationMode.ToString()),
                 new M2922_GizmoDisplayInfo("Players",      _allowPlayers        ? "✔" : "✘", _allowPlayers        ? Color.green : Color.gray),
                 new M2922_GizmoDisplayInfo("NPCs",         _allowNPCs           ? "✔" : "✘", _allowNPCs           ? Color.green : Color.gray),
-                new M2922_GizmoDisplayInfo("Weapons",      _allowWeapons        ? "✔" : "✘", _allowWeapons        ? Color.green : Color.gray),
-                new M2922_GizmoDisplayInfo("Projectiles",  _allowProjectiles    ? "✔" : "✘", _allowProjectiles    ? Color.green : Color.gray),
+                new M2922_GizmoDisplayInfo("Vehicles",     _allowVehicles       ? "✔" : "✘", _allowVehicles       ? Color.green : Color.gray),
+                new M2922_GizmoDisplayInfo("Objects",      _allowObjects        ? "✔" : "✘", _allowObjects        ? Color.green : Color.gray),
                 new M2922_GizmoDisplayInfo("Physics Objs", _allowPhysicsObjects ? "✔" : "✘", _allowPhysicsObjects ? Color.green : Color.gray),
                 new M2922_GizmoDisplayInfo("Rider Radius", _riderTeleportRadius > 0f ? $"{_riderTeleportRadius}m" : "OFF"),
                 new M2922_GizmoDisplayInfo("Preserve Offset", _preserveOffset ? "ON" : "OFF", _preserveOffset ? Color.green : Color.gray),

@@ -64,8 +64,6 @@ namespace M2922.Component.Weapon
         [SerializeField] private float _bakedFrameVelocity;
         [SerializeField] private float _bakedFrameAccuracy;
         [SerializeField] private int _bakedFrameReloadStyle = 0;  // ReloadStyle cast to int
-        [SerializeField] private int _bakedFrameExplosionTrigger = 0;  // ExplosionTrigger cast to int
-        [SerializeField] private float _bakedFrameExplosionDelay = 0f;
 
         // ===================================================
         // BAKED POOLS : NOMS
@@ -130,8 +128,7 @@ namespace M2922.Component.Weapon
         private float _finalBlastRadius;
         private float _finalVelocity;
         private float _finalAccuracy;
-        private int _finalExplosionTrigger;    // ExplosionTrigger cast to int
-        private float _finalExplosionDelay;
+        private int _finalReloadStyle;    // ReloadStyle cast to int
 
         private float _finalBossDmgMult = 1f;
         private float _finalMajorDmgMult = 1f;
@@ -179,8 +176,6 @@ namespace M2922.Component.Weapon
         public int Magazine { get { return _finalMagazine; } }
         public float BlastRadius { get { return _finalBlastRadius; } }
         public float Velocity { get { return _finalVelocity; } }
-        public int ExplosionTriggerAsInt { get { return _finalExplosionTrigger; } }
-        public float ExplosionDelay { get { return _finalExplosionDelay; } }
 
         // Stats BAKÉES de la frame (utilisées par le gizmo et l'éditeur)
         public float BakedFrameImpact { get { return _bakedFrameImpact; } }
@@ -200,8 +195,6 @@ namespace M2922.Component.Weapon
         public float BakedFrameVelocity { get { return _bakedFrameVelocity; } }
         public float BakedFrameAccuracy { get { return _bakedFrameAccuracy; } }
         public int FrameReloadStyle { get { return _bakedFrameReloadStyle; } }
-        public int FrameExplosionTrigger { get { return _bakedFrameExplosionTrigger; } }
-        public float FrameExplosionDelay { get { return _bakedFrameExplosionDelay; } }
 
         // Noms des perks/masterwork/mod rollés
         public string RolledPerk1Name { get { return GetPoolName(_bakedPerk1PoolNames, _rolledPerk1Index); } }
@@ -285,8 +278,6 @@ namespace M2922.Component.Weapon
             _finalBlastRadius = _bakedFrameBlastRadius;
             _finalVelocity = _bakedFrameVelocity;
             _finalAccuracy = _bakedFrameAccuracy;
-            _finalExplosionTrigger = _bakedFrameExplosionTrigger;
-            _finalExplosionDelay = _bakedFrameExplosionDelay;
 
             // Ajouter les perks rollés
             AddPoolStats(_bakedPerk1PoolStats, _rolledPerk1Index);
@@ -472,8 +463,6 @@ namespace M2922.Component.Weapon
                 _bakedFrameVelocity = fs.Velocity;
                 _bakedFrameAccuracy = fs.Accuracy;
                 _bakedFrameReloadStyle = (int)def.Frame.ReloadStyle;
-                _bakedFrameExplosionTrigger = (int)def.Frame.ExplosionTrigger;
-                _bakedFrameExplosionDelay = def.Frame.ExplosionDelay;
             }
 
             // Bake perk pools
@@ -641,8 +630,6 @@ namespace M2922.Component.Weapon
             _bakedFrameRPM = 0f; _bakedFrameChargeTime = 0f; _bakedFrameDrawTime = 0f;
             _bakedFrameMagazine = 0; _bakedFrameBlastRadius = 0f; _bakedFrameVelocity = 0f; _bakedFrameAccuracy = 0f;
             _bakedFrameReloadStyle = 0;
-            _bakedFrameExplosionTrigger = 0;
-            _bakedFrameExplosionDelay = 0f;
 
             _bakedPerk1PoolNames = new string[0]; _bakedPerk1PoolStats = new float[0];
             _bakedPerk2PoolNames = new string[0]; _bakedPerk2PoolStats = new float[0];

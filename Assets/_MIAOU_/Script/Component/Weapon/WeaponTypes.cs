@@ -103,7 +103,11 @@ namespace M2922.Component.Weapon
         /// <summary>Explose à l'impact ET à la mort (grenade par défaut).</summary>
         OnImpactAndDeath = 1,
         /// <summary>Explose uniquement quand la durée de vie expire.</summary>
-        OnDeath = 2
+        OnDeath = 2,
+        /// <summary>Explose à l'impact ET après un délai (grenade à retardement).</summary>
+        OnImpactAndAfterDelay = 3,
+        /// <summary>Explose à l'impact ET après un délai ET à la mort (grenade à retardement + timer).</summary>
+        OnImpactAndAfterDelayAndOnDeath = 4
     }
 
     /// <summary>

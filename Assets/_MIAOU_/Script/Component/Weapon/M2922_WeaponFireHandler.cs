@@ -81,6 +81,12 @@ namespace M2922.Component.Weapon
         private M2922_Projectile[] _pool;
         private int _poolIndex = 0;
 
+        [Header("=== PROJECTILE CONFIG ===")]
+        [Tooltip("Déclencheur d'explosion (Default = défaut par type d'arme).")]
+        [SerializeField] private ExplosionTrigger _explosionTrigger = ExplosionTrigger.Default;
+        [Tooltip("Délai entre le premier impact et l'explosion (secondes). <0 = défaut par type.")]
+        [SerializeField] private float _explosionDelay = -1f;
+
         [Header("=== BEAM (Trace Rifle) ===")]
         [SerializeField] private LineRenderer _beamRenderer;
         [Tooltip("Layers que le beam traverse/détecte (hitbox + environment).")]
@@ -299,6 +305,14 @@ namespace M2922.Component.Weapon
             bool wasOwner = Networking.IsOwner(gameObject);
             if (_localPlayer != null && !wasOwner)
                 Networking.SetOwner(_localPlayer, gameObject);
+
+            // Reset les compteurs de VFX réseau pour éviter un flash fantôme
+            // au moment du transfert d'ownership (le nouveau owner re-serialize tout).
+            _fireTick = 0;
+            _lastFireTick = 0;
+            _projectileFireTick = 0;
+            _lastProjectileFireTick = 0;
+            RequestSerialization();
 
             this.Log($"[FireHandler] HandlePickup — localPlayer={(_localPlayer != null ? _localPlayer.displayName : "NULL")}, wasOwner={wasOwner}, isOwnerNow={Networking.IsOwner(gameObject)}");
         }
@@ -656,50 +670,20 @@ namespace M2922.Component.Weapon
                     int beamPathCount = 1;
                     beamPath[0] = origin;
 
-                    // Traverse jusqu'à 3 téléporteurs successifs (portal)
+                    // Traverse jusqu'à 3 téléporteurs successifs (ligne droite)
                     for (int pass = 0; pass < 4; pass++)
                     {
                         if (!Physics.Raycast(beamRayOrigin, beamRayDir, out hit, remainingBeamRange, _beamLayerMask, QueryTriggerInteraction.Collide))
                             break;
 
-                        // Téléporteur : on traverse toujours.
-                        // AllowProjectiles → portal, sinon → ligne droite.
+                        // Téléporteur : on traverse toujours en ligne droite.
                         M2922_Teleporter tp = hit.collider.GetComponentInParent<M2922_Teleporter>();
                         if (tp != null)
                         {
-                            Vector3 entryPt = hit.point;
-                            if (tp.AllowProjectiles)
-                            {
-                                Vector3 exitPoint, exitDir;
-                                if (tp.ComputeExitRay(entryPt, beamRayDir, out exitPoint, out exitDir))
-                                {
-                                    float distUsed = hit.distance + 0.01f;
-                                    remainingBeamRange -= distUsed;
-                                    if (remainingBeamRange <= 0f) break;
-
-                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = entryPt;
-                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = exitPoint;
-
-                                    beamRayOrigin = exitPoint;
-                                    beamRayDir = exitDir;
-                                }
-                                else
-                                {
-                                    float distUsed = hit.distance + 0.01f;
-                                    remainingBeamRange -= distUsed;
-                                    if (remainingBeamRange <= 0f) break;
-                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = hit.point;
-                                    beamRayOrigin = hit.point + beamRayDir * 0.01f;
-                                }
-                            }
-                            else
-                            {
-                                // TP sans AllowProjectiles → traverse en ligne droite
-                                float distUsed = hit.distance + 0.01f;
-                                remainingBeamRange -= distUsed;
-                                if (remainingBeamRange <= 0f) break;
-                                beamRayOrigin = hit.point + beamRayDir * 0.01f;
-                            }
+                            float distUsed = hit.distance + 0.01f;
+                            remainingBeamRange -= distUsed;
+                            if (remainingBeamRange <= 0f) break;
+                            beamRayOrigin = hit.point + beamRayDir * 0.01f;
                             continue;
                         }
 
@@ -885,7 +869,7 @@ namespace M2922.Component.Weapon
         public override void OnDeserialization()
         {
             // --- VFX : muzzle flash pour les autres joueurs ---
-            if (_fireTick != _lastFireTick)
+            if (_fireTick != _lastFireTick && _fireTick > 0)
             {
                 _lastFireTick = _fireTick;
 
@@ -958,7 +942,7 @@ namespace M2922.Component.Weapon
             }
 
             // --- PROJECTILE REMOTE SPAWN : les autres joueurs voient le projectile ---
-            if (_projectileFireTick != _lastProjectileFireTick)
+            if (_projectileFireTick != _lastProjectileFireTick && _projectileFireTick > 0)
             {
                 _lastProjectileFireTick = _projectileFireTick;
 
@@ -1080,39 +1064,14 @@ namespace M2922.Component.Weapon
                     if (!Physics.Raycast(rayOrigin, rayDir, out hit, remainingRange, _hitscanLayerMask, QueryTriggerInteraction.Collide))
                         break;
 
-                    // Si on tape un téléporteur, on traverse toujours.
-                    // AllowProjectiles → portal (entrée→sortie), sinon → ligne droite.
+                    // Si on tape un téléporteur, on traverse toujours en ligne droite.
                     M2922_Teleporter tp = hit.collider.GetComponentInParent<M2922_Teleporter>();
                     if (tp != null)
                     {
-                        if (tp.AllowProjectiles)
-                        {
-                            Vector3 exitPoint, exitDir;
-                            if (tp.ComputeExitRay(hit.point, rayDir, out exitPoint, out exitDir))
-                            {
-                                float distUsed = hit.distance + 0.01f;
-                                remainingRange -= distUsed;
-                                if (remainingRange <= 0f) break;
-                                rayOrigin = exitPoint;
-                                rayDir = exitDir;
-                            }
-                            else
-                            {
-                                // Pas de destination → ligne droite
-                                float distUsed = hit.distance + 0.01f;
-                                remainingRange -= distUsed;
-                                if (remainingRange <= 0f) break;
-                                rayOrigin = hit.point + rayDir * 0.01f;
-                            }
-                        }
-                        else
-                        {
-                            // TP n'accepte pas les projectiles → traverse en ligne droite
-                            float distUsed = hit.distance + 0.01f;
-                            remainingRange -= distUsed;
-                            if (remainingRange <= 0f) break;
-                            rayOrigin = hit.point + rayDir * 0.01f;
-                        }
+                        float distUsed = hit.distance + 0.01f;
+                        remainingRange -= distUsed;
+                        if (remainingRange <= 0f) break;
+                        rayOrigin = hit.point + rayDir * 0.01f;
                         continue;
                     }
 
@@ -1359,28 +1318,24 @@ namespace M2922.Component.Weapon
             // Gravité : GL = 2.5×, Rockets = 0.5×, autres = 1×
             float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
 
-            // Explosion config depuis la frame
-            int explTrigger = _weapon.ExplosionTriggerAsInt;
-            float explDelay = _weapon.ExplosionDelay;
+            // Explosion config : override FireHandler → sinon défaut par type d'arme
+            int explTrigger;
+            float explDelay;
 
-            // Appliquer les défauts par type si la frame n'a pas configuré explicitement
-            if (explTrigger == (int)ExplosionTrigger.Default || explTrigger < 0)
+            if (_explosionTrigger != ExplosionTrigger.Default)
             {
-                if (IsGrenadeLauncher(_weaponType))
-                {
-                    explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
-                    explDelay = (explDelay < 0f) ? 1f : explDelay;
-                }
-                else // RocketLauncher, RocketSidearm
-                {
-                    explTrigger = (int)ExplosionTrigger.OnImpact;
-                    explDelay = (explDelay < 0f) ? 0f : explDelay;
-                }
+                explTrigger = (int)_explosionTrigger;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 0f;
             }
-            else if (explDelay < 0f)
+            else if (IsGrenadeLauncher(_weaponType))
             {
-                // Trigger explicite mais delay pas configuré → 0 par défaut
-                explDelay = 0f;
+                explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 1f;
+            }
+            else // RocketLauncher, RocketSidearm, autres
+            {
+                explTrigger = (int)ExplosionTrigger.OnImpact;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 0f;
             }
 
             proj.Launch(pos, rot, speed,
@@ -1439,26 +1394,24 @@ namespace M2922.Component.Weapon
             float aimAssist = _weapon.AimAssistance;
             float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
 
-            // Explosion config
-            int explTrigger = _weapon.ExplosionTriggerAsInt;
-            float explDelay = _weapon.ExplosionDelay;
+            // Explosion config : override FireHandler → sinon défaut par type
+            int explTrigger;
+            float explDelay;
 
-            if (explTrigger == (int)ExplosionTrigger.Default || explTrigger < 0)
+            if (_explosionTrigger != ExplosionTrigger.Default)
             {
-                if (IsGrenadeLauncher(_weaponType))
-                {
-                    explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
-                    explDelay = (explDelay < 0f) ? 1f : explDelay;
-                }
-                else
-                {
-                    explTrigger = (int)ExplosionTrigger.OnImpact;
-                    explDelay = (explDelay < 0f) ? 0f : explDelay;
-                }
+                explTrigger = (int)_explosionTrigger;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 0f;
             }
-            else if (explDelay < 0f)
+            else if (IsGrenadeLauncher(_weaponType))
             {
-                explDelay = 0f;
+                explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 1f;
+            }
+            else
+            {
+                explTrigger = (int)ExplosionTrigger.OnImpact;
+                explDelay = _explosionDelay >= 0f ? _explosionDelay : 0f;
             }
 
             proj.LaunchVisual(pos, rot, speed,
@@ -1474,13 +1427,13 @@ namespace M2922.Component.Weapon
         // ===================================================
 
         /// <summary>
-        /// True si ce collider est un téléporteur qui laisse passer les projectiles/rayons.
+        /// True si ce collider est un téléporteur (traversable par les rayons).
         /// </summary>
         private bool IsTeleporterCollider(Collider col)
         {
             if (col == null) return false;
             M2922_Teleporter tp = col.GetComponentInParent<M2922_Teleporter>();
-            return tp != null && tp.AllowProjectiles;
+            return tp != null;
         }
 
         private bool CanFire()
@@ -1662,6 +1615,21 @@ namespace M2922.Component.Weapon
         public void SetFiring(bool firing)
         {
             FireInput(firing);
+        }
+
+        // ===================================================
+        // PROJECTILE CONFIG API (modifiable au runtime)
+        // ===================================================
+
+        /// <summary>Définit le déclencheur d'explosion. Default = défaut par type d'arme.</summary>
+        public void SetExplosionTrigger(ExplosionTrigger trigger) { _explosionTrigger = trigger; }
+        /// <summary>Définit le délai entre impact et explosion (secondes). <0 = défaut par type.</summary>
+        public void SetExplosionDelay(float delay) { _explosionDelay = delay; }
+        /// <summary>Reset la config projectile aux valeurs par défaut.</summary>
+        public void ResetProjectileConfig()
+        {
+            _explosionTrigger = ExplosionTrigger.Default;
+            _explosionDelay = -1f;
         }
 
         /// <summary>

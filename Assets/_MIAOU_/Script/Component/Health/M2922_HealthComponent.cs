@@ -17,10 +17,13 @@ namespace M2922.Component.Health
         [UdonSynced] private float _currentHP = 100f;
 
         [Header("=== REGEN ===")]
+        [Tooltip("Activer la régénération (config inspector).")]
         [SerializeField] private bool _enableRegen = false;
         [SerializeField] private float _regenPerSecond = 1f;
         [SerializeField] private float _regenDelay = 3f;
         private float _lastDamageTime = -999f;
+        /// <summary>Contrôle runtime de la regen (désactivée pendant la mort).</summary>
+        private bool _regenEnabled = true;
 
         [Header("=== NETWORK AUTHORITY ===")]
         [SerializeField] private M2922_HitboxSystem _hitboxSystem;
@@ -41,7 +44,7 @@ namespace M2922.Component.Health
         protected override void Update()
         {
             base.Update();
-            if (_enableRegen && !IsDead && Time.time - _lastDamageTime > _regenDelay)
+            if (_enableRegen && _regenEnabled && !IsDead && Time.time - _lastDamageTime > _regenDelay)
             {
                 _currentHP = Mathf.Min(_maxHP, _currentHP + _regenPerSecond * Time.deltaTime);
             }
@@ -89,6 +92,15 @@ namespace M2922.Component.Health
             _lastDamageTime = -999f;
             if (ShouldSync()) RequestSerialization();
         }
+
+        /// <summary>Active/désactive la régénération runtime (utilisé par DeathHandler).</summary>
+        public void SetRegenEnabled(bool enabled)
+        {
+            _regenEnabled = enabled;
+        }
+
+        /// <summary>True si la regen est configurée ET active en runtime.</summary>
+        public bool IsRegenActive => _enableRegen && _regenEnabled;
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
         protected override M2922_GizmoDisplayInfo[] GetGizmoValues()

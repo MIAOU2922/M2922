@@ -87,17 +87,6 @@ namespace M2922.Component.Weapon.Editor
                 EditorGUILayout.LabelField("Airborne", FV("_bakedFrameAirborneEffectiveness").ToString("F1"));
                 EditorGUILayout.LabelField("Reload Style", ((ReloadStyle)IV("_bakedFrameReloadStyle")).ToString());
 
-                // ---- EXPLOSION CONFIG ---- 
-                int explTrig = IV("_bakedFrameExplosionTrigger");
-                float explDelay = FV("_bakedFrameExplosionDelay");
-                if (explTrig != 0 || explDelay > 0f)
-                {
-                    Color oldExp = GUI.color;
-                    GUI.color = new Color(1f, 0.7f, 0.3f);
-                    EditorGUILayout.LabelField("Explosion", $"{(ExplosionTrigger)explTrig}  delay:{explDelay:F1}s");
-                    GUI.color = oldExp;
-                }
-
                 // ---- LAUNCHER STATS (si BlastRadius > 0) ----
                 float blastStat = FV("_bakedFrameBlastRadius");
                 float velStat = FV("_bakedFrameVelocity");
@@ -279,8 +268,6 @@ namespace M2922.Component.Weapon.Editor
                 SetF("_bakedFrameVelocity", fs.Velocity);
                 SetF("_bakedFrameAccuracy", fs.Accuracy);
                 SetI("_bakedFrameReloadStyle", (int)def.Frame.ReloadStyle);
-                SetI("_bakedFrameExplosionTrigger", (int)def.Frame.ExplosionTrigger);
-                SetF("_bakedFrameExplosionDelay", def.Frame.ExplosionDelay);
             }
 
             BakePerkPool(def.PerkColumn1Pool, "_bakedPerk1PoolNames", "_bakedPerk1PoolStats", S);

@@ -28,13 +28,6 @@ namespace M2922.Component.Weapon
         [Tooltip("Style de rechargement par défaut pour cette frame.")]
         public ReloadStyle ReloadStyle = ReloadStyle.Default;
 
-        [Header("=== PROJECTILE EXPLOSION ===")]
-        [Tooltip("Quand le projectile explose : impact, mort, ou les deux. Default = déterminé par le type d'arme.")]
-        public ExplosionTrigger ExplosionTrigger = ExplosionTrigger.Default;
-        [Tooltip("Délai avant explosion après le déclencheur (secondes). -1 = défaut par type, 0 = instantané.")]
-        [Range(-1f, 10f)]
-        public float ExplosionDelay = -1f;
-
         // ===== HELPERS =====
         public string FullName => $"{FrameName} ({WeaponType})";
 

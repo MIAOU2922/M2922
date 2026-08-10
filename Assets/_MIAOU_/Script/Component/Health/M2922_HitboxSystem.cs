@@ -34,6 +34,15 @@ namespace M2922.Component.Health
         [Tooltip("Layer ID résolu automatiquement (ne pas modifier).")]
         [SerializeField] private int _hitboxLayer = 8;
 
+        [Header("=== PROXIMITY HITBOX (rocket only) ===")]
+        [Tooltip("Capsule optionnelle pour les roquettes : une roquette qui passe près du joueur\n" +
+                 "touche ce collider et explose. Les raycasts (hitscan) l'ignorent.")]
+        [SerializeField] private Collider _proximityCollider;
+        [Tooltip("Nom du layer Unity pour ce collider de proximité.")]
+        [SerializeField] private string _proximityHitboxLayerName = "ProximityHitbox";
+        [Tooltip("Layer ID résolu (ne pas modifier).")]
+        [SerializeField] private int _proximityHitboxLayer = 0;
+
         [Header("=== PLAYER BINDING ===")]
         [Tooltip("Player ID auquel ce HitboxSystem est lié (-1 = NPC/destructible). Défini par le système de spawn.")]
         [SerializeField] private int _boundPlayerId = -1;
@@ -55,6 +64,7 @@ namespace M2922.Component.Health
         /// </summary>
         public int HitboxCount => _hitboxColliders != null ? _hitboxColliders.Length : 0;
         public Collider[] HitboxColliders => _hitboxColliders;
+        public Collider ProximityCollider => _proximityCollider;
         public int BoundPlayerId => _boundPlayerId;
         public int EntityId => _entityId;
         public bool IsPlayer => _isPlayer;
@@ -95,6 +105,12 @@ namespace M2922.Component.Health
             for (int i = 0; i < _hitboxColliders.Length; i++)
                 if (_hitboxColliders[i] == col) return true;
             return false;
+        }
+
+        /// <summary>True si le collider est le proximity hitbox de cette entité (rocket only).</summary>
+        public bool IsMyProximityCollider(Collider col)
+        {
+            return _proximityCollider != null && _proximityCollider == col;
         }
 
         /// <summary>True si le collider a un M2922_DamageMultiplier.</summary>
@@ -195,6 +211,10 @@ namespace M2922.Component.Health
             _hitboxLayer = UnityEngine.LayerMask.NameToLayer(_hitboxLayerName);
             if (_hitboxLayer < 0) _hitboxLayer = 8; // fallback
 
+            // Résoudre le layer de proximité
+            _proximityHitboxLayer = UnityEngine.LayerMask.NameToLayer(_proximityHitboxLayerName);
+            if (_proximityHitboxLayer < 0) _proximityHitboxLayer = 0;
+
             // Auto-assigner le layer à tous les colliders
             if (_hitboxColliders != null)
             {
@@ -207,6 +227,13 @@ namespace M2922.Component.Health
                         UnityEditor.EditorUtility.SetDirty(col.gameObject);
                     }
                 }
+            }
+
+            // Auto-assigner le layer de proximité au collider de proximité
+            if (_proximityCollider != null && _proximityCollider.gameObject.layer != _proximityHitboxLayer)
+            {
+                _proximityCollider.gameObject.layer = _proximityHitboxLayer;
+                UnityEditor.EditorUtility.SetDirty(_proximityCollider.gameObject);
             }
         }
 

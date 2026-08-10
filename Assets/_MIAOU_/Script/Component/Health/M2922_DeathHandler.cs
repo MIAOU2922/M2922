@@ -17,12 +17,18 @@ namespace M2922.Component.Health
         [SerializeField] private M2922_ShieldComponent _shield;
 
         [Header("=== RESPAWN ===")]
+        [Tooltip("Cocher si ce DeathHandler est sur un joueur (utilise VRCPlayerApi.TeleportTo + Immobilize).\n" +
+                 "Décocher pour un NPC (utilise transform.SetPositionAndRotation).")]
+        [SerializeField] private bool _isPlayer = false;
         [SerializeField] private bool _autoRespawn = true;
         [SerializeField] private float _respawnDelay = 3f;
         [SerializeField] private Transform _respawnPoint;
 
         private bool _isDead = false;
         private float _deathTime = 0f;
+        private float _respawnedTime = -999f; // période de grâce anti-re-death
+        private bool _healthRegenWasActive;   // mémorise l'état avant mort
+        private bool _shieldRegenWasActive;
 
         public bool IsDead => _isDead;
 
@@ -41,7 +47,13 @@ namespace M2922.Component.Health
         {
             base.Update();
 
-            if (_health != null && _health.IsDead && !_isDead)
+            // Seul le propriétaire de l'entité traite sa mort/respawn.
+            if (!Networking.IsOwner(gameObject)) return;
+
+            // Période de grâce après respawn : évite que l'entité remeure
+            // immédiatement si _health.IsDead est encore true 1 frame après Revive().
+            if (_health != null && _health.IsDead && !_isDead
+                && Time.time - _respawnedTime > 0.5f)
             {
                 Die();
             }
@@ -57,40 +69,64 @@ namespace M2922.Component.Health
             _isDead = true;
             _deathTime = Time.time;
 
-            // Drop tous les VRC Pickup tenus
-            DropAllPickups();
+            VRCPlayerApi localPlayer = Networking.LocalPlayer;
 
-            // TP au point de respawn
+            // ── 0. STOP REGEN (mémoriser l'état avant) ─────────────────
+            _healthRegenWasActive = _health != null && _health.IsRegenActive;
+            _shieldRegenWasActive = _shield != null && _shield.IsRegenActive;
+            if (_health != null) _health.SetRegenEnabled(false);
+            if (_shield != null) _shield.SetRegenEnabled(false);
+
+            // ── 1. FREEZE ──────────────────────────────────────────────
+            if (_isPlayer && localPlayer != null && localPlayer.IsValid())
+                localPlayer.Immobilize(true);
+
+            // ── 2. DROP PICKUPS (joueur seulement) ─────────────────────
+            if (_isPlayer)
+                DropAllPickups();
+
+            // ── 3. TP AU RESPAWN ───────────────────────────────────────
             if (_respawnPoint != null)
-                transform.SetPositionAndRotation(_respawnPoint.position, _respawnPoint.rotation);
+            {
+                if (_isPlayer && localPlayer != null && localPlayer.IsValid())
+                    localPlayer.TeleportTo(_respawnPoint.position, _respawnPoint.rotation);
+                else
+                    transform.SetPositionAndRotation(_respawnPoint.position, _respawnPoint.rotation);
+            }
 
-            this.Log("Entity died.");
-            // TODO: trigger OnDeath event, ragdoll, disable colliders...
+            this.Log(_isPlayer ? "Player died." : "Entity died.");
         }
 
         private void Respawn()
         {
             _isDead = false;
+            _respawnedTime = Time.time;
 
-            // Restaurer vie et shield
-            if (_health != null) _health.Revive();
-            if (_shield != null) _shield.Revive();
+            // ── 4. REGEN VIE + SHIELD (restaurer si actif avant mort) ──
+            if (_health != null) { _health.Revive(); if (_healthRegenWasActive) _health.SetRegenEnabled(true); }
+            if (_shield != null) { _shield.Revive(); if (_shieldRegenWasActive) _shield.SetRegenEnabled(true); }
 
-            this.Log("Entity respawned.");
+            // ── 5. UNFREEZE ────────────────────────────────────────────
+            if (_isPlayer)
+            {
+                VRCPlayerApi localPlayer = Networking.LocalPlayer;
+                if (localPlayer != null && localPlayer.IsValid())
+                    localPlayer.Immobilize(false);
+            }
+
+            this.Log(_isPlayer ? "Player respawned." : "Entity respawned.");
         }
 
-        /// <summary>Drop tous les VRC_Pickup actuellement tenus par ce GameObject/enfants.</summary>
+        /// <summary>Drop les VRC_Pickup tenus par le joueur local (mains gauche+droite).</summary>
         private void DropAllPickups()
         {
-            VRC_Pickup[] pickups = GetComponentsInChildren<VRC_Pickup>();
-            if (pickups != null)
-            {
-                for (int i = 0; i < pickups.Length; i++)
-                {
-                    if (pickups[i] != null && pickups[i].IsHeld)
-                        pickups[i].Drop();
-                }
-            }
+            VRCPlayerApi local = Networking.LocalPlayer;
+            if (local == null || !local.IsValid()) return;
+
+            VRC_Pickup left  = local.GetPickupInHand(VRC_Pickup.PickupHand.Left);
+            VRC_Pickup right = local.GetPickupInHand(VRC_Pickup.PickupHand.Right);
+            if (left  != null) left.Drop();
+            if (right != null) right.Drop();
         }
 
         public void ForceRespawn()
@@ -103,6 +139,7 @@ namespace M2922.Component.Health
         {
             return new M2922_GizmoDisplayInfo[]
             {
+                new M2922_GizmoDisplayInfo("Target", _isPlayer ? "PLAYER" : "NPC", _isPlayer ? Color.cyan : Color.yellow),
                 new M2922_GizmoDisplayInfo("Dead", _isDead ? "YES" : "NO", _isDead ? Color.red : Color.green),
                 new M2922_GizmoDisplayInfo("Auto Respawn", _autoRespawn ? "ON" : "OFF"),
                 new M2922_GizmoDisplayInfo("Respawn In", $"{_respawnDelay}s"),

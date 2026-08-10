@@ -33,6 +33,8 @@ namespace M2922.Component.Health
         [Header("=== MATERIAUX ===")]
         [SerializeField] private Material _normalMaterial;
         [SerializeField] private Material _critMaterial;
+        [Tooltip("Matériau pour le collider de proximité (rocket only).")]
+        [SerializeField] private Material _proximityMaterial;
 
         [Header("=== VISIBILITY ===")]
         [Tooltip("ShowAll = toujours visible | HideLocal = caché si le GO nous appartient | HideAll = toujours caché")]
@@ -48,6 +50,10 @@ namespace M2922.Component.Health
         private GameObject[] _created = new GameObject[0];
         private Collider[] _createdParents = new Collider[0];
         private int _createdCount = 0;
+
+        // Mesh debug pour le collider de proximité (séparé car pas dans _hitboxColliders)
+        private GameObject _proximityVis;
+        private Collider _proximityVisParent;
 
         protected override void Start()
         {
@@ -85,8 +91,16 @@ namespace M2922.Component.Health
                 if (vis == null || parentCol == null) continue;
                 ApplyScale(vis.transform, parentCol);
 
-                // Synchroniser la visibilité dynamiquement (l'ownership peut changer)
                 MeshRenderer mr = vis.GetComponent<MeshRenderer>();
+                if (mr != null && mr.enabled != shouldShow)
+                    mr.enabled = shouldShow;
+            }
+
+            // Proximity collider debug mesh
+            if (_proximityVis != null && _proximityVisParent != null)
+            {
+                ApplyScale(_proximityVis.transform, _proximityVisParent);
+                MeshRenderer mr = _proximityVis.GetComponent<MeshRenderer>();
                 if (mr != null && mr.enabled != shouldShow)
                     mr.enabled = shouldShow;
             }
@@ -159,7 +173,28 @@ namespace M2922.Component.Health
             // Appliquer la visibilité initiale
             ApplyVisibility();
 
-            Debug.Log($"[HitboxDebugVisualizer] {_createdCount}/{count} hitbox(es) visualisées.", this);
+            // --- COLLIDER DE PROXIMITÉ ---
+            Collider proxCol = _hitboxSystem.ProximityCollider;
+            if (proxCol != null && _proximityMaterial != null)
+            {
+                GameObject prefab = _cubePrefab;
+                if (proxCol.GetComponent<SphereCollider>() != null)
+                    prefab = _spherePrefab;
+                else if (proxCol.GetComponent<CapsuleCollider>() != null)
+                    prefab = _capsulePrefab;
+
+                if (prefab != null)
+                {
+                    _proximityVis = Instantiate(prefab);
+                    _proximityVis.name = "[DEBUG_PROXIMITY] " + proxCol.name;
+                    _proximityVis.transform.SetParent(proxCol.transform, false);
+                    _proximityVisParent = proxCol;
+                    MeshRenderer mr = _proximityVis.GetComponent<MeshRenderer>();
+                    if (mr != null) mr.material = _proximityMaterial;
+                }
+            }
+
+            Debug.Log($"[HitboxDebugVisualizer] {_createdCount}/{count} hitbox(es) visualisées + proximity={_proximityVis != null}.", this);
         }
 
         /// <summary>
@@ -193,6 +228,12 @@ namespace M2922.Component.Health
                 MeshRenderer mr = vis.GetComponent<MeshRenderer>();
                 if (mr != null) mr.enabled = shouldShow;
             }
+
+            if (_proximityVis != null)
+            {
+                MeshRenderer mr = _proximityVis.GetComponent<MeshRenderer>();
+                if (mr != null) mr.enabled = shouldShow;
+            }
         }
 
         private void ClearAll()
@@ -204,6 +245,10 @@ namespace M2922.Component.Health
                 _createdParents[i] = null;
             }
             _createdCount = 0;
+
+            if (_proximityVis != null) Destroy(_proximityVis);
+            _proximityVis = null;
+            _proximityVisParent = null;
         }
 
         private static void ApplyScale(Transform t, Collider col)

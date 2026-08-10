@@ -73,10 +73,12 @@ namespace M2922.Component.Weapon
         private float _explosionDelayTimer = 0f;
         /// <summary>True quand le délai est en cours.</summary>
         private bool _explosionPending = false;
-        /// <summary>Position figée pendant le délai (pour les grenades).</summary>
-        private Vector3 _pendingExplosionPos;
         /// <summary>True si le projectile est mort (durée de vie expirée).</summary>
         private bool _isDead = false;
+
+        [Header("=== SLIDE FRICTION ===")]
+        [Tooltip("Friction au sol après impact (0 = glace infinie, 5 = arrêt rapide). Appliqué uniquement pendant le délai d'explosion.")]
+        [SerializeField] private float _groundFriction = 4f;
 
         [Header("=== OCCLUSION ===")]
         [Tooltip("Layers considérés comme obstacles pour l'explosion (murs, sol). Hitbox/UI/Pickup exclus.")]
@@ -94,6 +96,10 @@ namespace M2922.Component.Weapon
         [SerializeField] private string _hitboxLayerName = "Hitbox";
         [Tooltip("Layer ID (auto-résolu, ne pas modifier).")]
         [SerializeField] public int _hitboxLayer = 8;
+        [Tooltip("Nom du layer Unity pour la hitbox de proximité (rocket only).")]
+        [SerializeField] private string _proximityHitboxLayerName = "ProximityHitbox";
+        [Tooltip("Layer ID de proximité (auto-résolu).")]
+        [SerializeField] private int _proximityHitboxLayer = 0;
 
         // --- Propriétés ---
         public bool IsActive { get { return _active; } }
@@ -227,7 +233,10 @@ namespace M2922.Component.Weapon
             if (_audioSource != null)
                 _audioSource.Stop();
             if (_rigidbody != null)
+            {
                 _rigidbody.velocity = Vector3.zero;
+                _rigidbody.isKinematic = false;
+            }
             gameObject.SetActive(false);
             if (_pool != null)
                 _pool.ReturnProjectile(this);
@@ -261,12 +270,27 @@ namespace M2922.Component.Weapon
             if (_explosionPending)
             {
                 _explosionDelayTimer -= Time.deltaTime;
+
+                // Lire la vélocité depuis le Rigidbody (inclut les rebonds naturels Unity)
+                if (_rigidbody != null)
+                    _velocity = _rigidbody.velocity;
+
+                // Appliquer gravité + friction au sol
+                _velocity += Physics.gravity * _gravityScale * Time.deltaTime;
+                float friction = 1f - _groundFriction * Time.deltaTime;
+                if (friction < 0f) friction = 0f;
+                _velocity.x *= friction;
+                _velocity.z *= friction;
+
+                if (_rigidbody != null)
+                    _rigidbody.velocity = _velocity;
+
                 if (_explosionDelayTimer <= 0f)
                 {
                     _explosionPending = false;
                     ExplodeInternal();
                 }
-                return; // Figé pendant le délai
+                return;
             }
 
             // --- Mort naturelle (durée de vie expirée) ---
@@ -274,9 +298,10 @@ namespace M2922.Component.Weapon
             if (_elapsed >= _lifetime)
             {
                 _isDead = true;
-                // OnImpactAndDeath ou OnDeath : exploser à la mort
+                // Explose à la mort : OnImpactAndDeath, OnDeath, OnImpactAndAfterDelayAndOnDeath
                 if (_explosionTrigger == (int)ExplosionTrigger.OnImpactAndDeath
-                    || _explosionTrigger == (int)ExplosionTrigger.OnDeath)
+                    || _explosionTrigger == (int)ExplosionTrigger.OnDeath
+                    || _explosionTrigger == (int)ExplosionTrigger.OnImpactAndAfterDelayAndOnDeath)
                 {
                     if (_explosionDelay > 0f)
                     {
@@ -285,6 +310,7 @@ namespace M2922.Component.Weapon
                     }
                     else
                     {
+                        FreezeRigidbody();
                         ExplodeInternal();
                     }
                 }
@@ -341,7 +367,7 @@ namespace M2922.Component.Weapon
             if (aimConeAngle > 0.5f)
             {
                 Collider[] hits = Physics.OverlapSphere(transform.position, aimRange,
-                    1 << _hitboxLayer, QueryTriggerInteraction.Collide);
+                    (1 << _hitboxLayer) | (1 << _proximityHitboxLayer), QueryTriggerInteraction.Collide);
                 Collider best = null;
                 float bestAngle = aimConeAngle;
                 foreach (var col in hits)
@@ -377,13 +403,14 @@ namespace M2922.Component.Weapon
             if (_explosionPending) return; // Déjà en attente d'explosion
 
             // Téléporteur : ne jamais exploser au contact.
-            // Le téléporteur décide lui-même s'il tp ou non selon _allowProjectiles.
             M2922_Teleporter tp = other.GetComponentInParent<M2922_Teleporter>();
             if (tp != null)
                 return;
 
-            // Hitbox : appliquer les dégâts directs (sauf si visuel-only)
-            if (!_visualOnly && other.gameObject.layer == _hitboxLayer)
+            // Hitbox + Proximity hitbox : appliquer les dégâts directs (sauf si visuel-only)
+            bool isHitbox = other.gameObject.layer == _hitboxLayer;
+            bool isProximity = other.gameObject.layer == _proximityHitboxLayer;
+            if (!_visualOnly && (isHitbox || isProximity))
             {
                 float zoneMult = 1f;
                 var dmgMult = other.GetComponent<M2922_DamageMultiplier>();
@@ -399,7 +426,7 @@ namespace M2922.Component.Weapon
                     while (t != null)
                     {
                         var hitboxSys = t.GetComponentInChildren<M2922_HitboxSystem>();
-                        if (hitboxSys != null && hitboxSys.IsMyCollider(other))
+                        if (hitboxSys != null && (hitboxSys.IsMyCollider(other) || hitboxSys.IsMyProximityCollider(other)))
                         {
                             receiver = hitboxSys.GetComponent<M2922_DamageReceiver>();
                             break;
@@ -418,11 +445,33 @@ namespace M2922.Component.Weapon
                 }
             }
 
-            // Exploser au contact (avec délai si configuré)
-            if (_explosionDelay > 0f)
-                StartExplosionDelay(transform.position);
-            else
-                ExplodeInternal();
+            // Explosion selon le mode de déclenchement
+            switch (_explosionTrigger)
+            {
+                case (int)ExplosionTrigger.OnDeath:
+                    // OnDeath : ne jamais exploser à l'impact, seulement quand le lifetime expire
+                    return;
+
+                case (int)ExplosionTrigger.OnImpact:
+                case (int)ExplosionTrigger.OnImpactAndDeath:
+                    // Explosion immédiate à l'impact
+                    FreezeRigidbody();
+                    ExplodeInternal();
+                    return;
+
+                case (int)ExplosionTrigger.OnImpactAndAfterDelay:
+                case (int)ExplosionTrigger.OnImpactAndAfterDelayAndOnDeath:
+                default:
+                    // Avec délai : lancer le timer
+                    if (_explosionDelay > 0f)
+                        StartExplosionDelay(transform.position);
+                    else
+                    {
+                        FreezeRigidbody();
+                        ExplodeInternal();
+                    }
+                    return;
+            }
         }
 
         /// <summary>Collision physique (sol, murs, objets non-trigger).</summary>
@@ -436,27 +485,53 @@ namespace M2922.Component.Weapon
             if (tp != null)
                 return;
 
-            if (_explosionDelay > 0f)
-                StartExplosionDelay(transform.position);
-            else
-                ExplodeInternal();
+            // Même logique que OnTriggerEnter
+            switch (_explosionTrigger)
+            {
+                case (int)ExplosionTrigger.OnDeath:
+                    return;
+
+                case (int)ExplosionTrigger.OnImpact:
+                case (int)ExplosionTrigger.OnImpactAndDeath:
+                    FreezeRigidbody();
+                    ExplodeInternal();
+                    return;
+
+                case (int)ExplosionTrigger.OnImpactAndAfterDelay:
+                case (int)ExplosionTrigger.OnImpactAndAfterDelayAndOnDeath:
+                default:
+                    if (_explosionDelay > 0f)
+                        StartExplosionDelay(transform.position);
+                    else
+                    {
+                        FreezeRigidbody();
+                        ExplodeInternal();
+                    }
+                    return;
+            }
         }
 
-        /// <summary>
-        /// Démarre le délai avant explosion. Le projectile est figé à la position donnée.
-        /// </summary>
-        private void StartExplosionDelay(Vector3 freezePos)
+        /// <summary>Stoppe immédiatement la physique du Rigidbody (anti-ricochet).</summary>
+        private void FreezeRigidbody()
         {
-            _explosionPending = true;
-            _explosionDelayTimer = _explosionDelay;
-            _pendingExplosionPos = freezePos;
             _velocity = Vector3.zero;
             if (_rigidbody != null)
             {
                 _rigidbody.velocity = Vector3.zero;
+                _rigidbody.angularVelocity = Vector3.zero;
                 _rigidbody.isKinematic = true;
             }
-            transform.position = freezePos;
+        }
+
+        /// <summary>
+        /// Démarre le délai avant explosion. Le projectile continue sa physique (rebond, gravité).
+        /// </summary>
+        private void StartExplosionDelay(Vector3 freezePos)
+        {
+            if (_explosionPending) return; // déjà en cours
+            _explosionPending = true;
+            _explosionDelayTimer = _explosionDelay;
+            // Ne pas figer : la physique reste active (rebonds, gravité)
 
             // Couper le son de vol
             if (_audioSource != null)
@@ -471,10 +546,10 @@ namespace M2922.Component.Weapon
             // Dégâts de zone : toutes les hitboxes dans le rayon (sauf si visuel-only)
             if (!_visualOnly && _splashDamage > 0f && _explosionRadius > 0f)
             {
-                Vector3 explCenter = _explosionPending ? _pendingExplosionPos : transform.position;
+                Vector3 explCenter = transform.position;
 
                 Collider[] hits = Physics.OverlapSphere(explCenter, _explosionRadius,
-                    1 << _hitboxLayer, QueryTriggerInteraction.Collide);
+                    (1 << _hitboxLayer) | (1 << _proximityHitboxLayer), QueryTriggerInteraction.Collide);
 
                 // Déduplication : max 100 receivers uniques (pas de List<T> en Udon)
                 M2922_DamageReceiver[] damaged = new M2922_DamageReceiver[100];
@@ -488,7 +563,7 @@ namespace M2922.Component.Weapon
                     float dist = toTarget.magnitude;
                     Vector3 dir = toTarget.normalized;
 
-                    // Raycast avec traversée des téléporteurs (portal, max 3)
+                    // Raycast avec traversée des téléporteurs (ligne droite, max 3)
                     float remainingDist = dist;
                     Vector3 rayStart = explCenter;
                     Vector3 rayDir = dir;
@@ -499,38 +574,14 @@ namespace M2922.Component.Weapon
                         if (!Physics.Raycast(rayStart, rayDir, out occHit, remainingDist, _obstacleLayerMask, QueryTriggerInteraction.Ignore))
                             break; // Rien touché → pas bloqué
 
-                        // Téléporteur : on traverse toujours.
-                        // AllowProjectiles → portal, sinon → ligne droite.
+                        // Téléporteur : on traverse toujours en ligne droite.
                         M2922_Teleporter tp = occHit.collider.GetComponentInParent<M2922_Teleporter>();
                         if (tp != null)
                         {
-                            if (tp.AllowProjectiles)
-                            {
-                                Vector3 exitPoint, exitDir;
-                                if (tp.ComputeExitRay(occHit.point, rayDir, out exitPoint, out exitDir))
-                                {
-                                    float used = occHit.distance + 0.01f;
-                                    remainingDist -= used;
-                                    if (remainingDist <= 0f) break;
-                                    rayStart = exitPoint;
-                                    rayDir = exitDir;
-                                }
-                                else
-                                {
-                                    float used = occHit.distance + 0.01f;
-                                    remainingDist -= used;
-                                    if (remainingDist <= 0f) break;
-                                    rayStart = occHit.point + rayDir * 0.01f;
-                                }
-                            }
-                            else
-                            {
-                                // TP sans AllowProjectiles → traverse en ligne droite
-                                float used = occHit.distance + 0.01f;
-                                remainingDist -= used;
-                                if (remainingDist <= 0f) break;
-                                rayStart = occHit.point + rayDir * 0.01f;
-                            }
+                            float used = occHit.distance + 0.01f;
+                            remainingDist -= used;
+                            if (remainingDist <= 0f) break;
+                            rayStart = occHit.point + rayDir * 0.01f;
                             continue;
                         }
 
@@ -555,7 +606,7 @@ namespace M2922.Component.Weapon
                         while (t != null)
                         {
                             var hs = t.GetComponentInChildren<M2922_HitboxSystem>();
-                            if (hs != null && hs.IsMyCollider(col))
+                            if (hs != null && (hs.IsMyCollider(col) || hs.IsMyProximityCollider(col)))
                             {
                                 receiver = hs.GetComponent<M2922_DamageReceiver>();
                                 break;
@@ -596,7 +647,7 @@ namespace M2922.Component.Weapon
             }
 
             // VFX d'explosion
-            Vector3 explPos = _explosionPending ? _pendingExplosionPos : transform.position;
+            Vector3 explPos = transform.position;
             if (_explosionVfxPrefab != null)
             {
                 GameObject vfx = Instantiate(_explosionVfxPrefab);
@@ -604,10 +655,6 @@ namespace M2922.Component.Weapon
                 vfx.transform.rotation = Quaternion.identity;
                 Destroy(vfx, _explosionVfxLifetime);
             }
-
-            // Reset rigidbody kinematic state
-            if (_rigidbody != null)
-                _rigidbody.isKinematic = false;
 
             _explosionPending = false;
             ReturnToPool();
@@ -625,6 +672,10 @@ namespace M2922.Component.Weapon
             // Résoudre le layer hitbox depuis le nom
             _hitboxLayer = UnityEngine.LayerMask.NameToLayer(_hitboxLayerName);
             if (_hitboxLayer < 0) _hitboxLayer = 8;
+
+            // Résoudre le layer de proximité
+            _proximityHitboxLayer = UnityEngine.LayerMask.NameToLayer(_proximityHitboxLayerName);
+            if (_proximityHitboxLayer < 0) _proximityHitboxLayer = 0;
 
             // Obstacle layer mask : tout SAUF hitbox, UI, Pickup, Player, etc.
             // On part de ~0 (tout) et on exclut les layers non-obstacles.

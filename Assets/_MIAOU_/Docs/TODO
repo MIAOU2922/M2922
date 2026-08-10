@@ -17,7 +17,6 @@ Vrchat System :
                 - trigger to swap weapon direction up/down [ toggle per definition ]
             - two handed [ configurable ]
             - grenade
-            - fix beam rendere on tp for remote user
         - life system (in progress)
             - for player
             - for object

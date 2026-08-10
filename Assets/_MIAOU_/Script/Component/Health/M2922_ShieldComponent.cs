@@ -20,6 +20,8 @@ namespace M2922.Component.Health
         [SerializeField] private float _regenPerSecond = 5f;
         [SerializeField] private float _regenDelay = 5f;
         private float _lastHitTime = -999f;
+        /// <summary>Contrôle runtime de la regen (désactivée pendant la mort).</summary>
+        private bool _regenEnabled = true;
 
         [Header("=== NETWORK AUTHORITY ===")]
         [SerializeField] private M2922_HitboxSystem _hitboxSystem;
@@ -38,7 +40,7 @@ namespace M2922.Component.Health
         protected override void Update()
         {
             base.Update();
-            if (Time.time - _lastHitTime > _regenDelay && _currentShield < _maxShield)
+            if (_regenEnabled && Time.time - _lastHitTime > _regenDelay && _currentShield < _maxShield)
             {
                 _currentShield = Mathf.Min(_maxShield, _currentShield + _regenPerSecond * Time.deltaTime);
                 if (ShouldSync()) RequestSerialization();
@@ -75,6 +77,15 @@ namespace M2922.Component.Health
         }
 
         /// <summary>Restaure le bouclier au maximum (respawn).</summary>
+        /// <summary>Active/désactive la régénération runtime (utilisé par DeathHandler).</summary>
+        public void SetRegenEnabled(bool enabled)
+        {
+            _regenEnabled = enabled;
+        }
+
+        /// <summary>True si la regen shield est active en runtime.</summary>
+        public bool IsRegenActive => _regenEnabled;
+
         public void Revive()
         {
             _currentShield = _maxShield;
