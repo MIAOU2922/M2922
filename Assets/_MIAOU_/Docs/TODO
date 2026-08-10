@@ -17,10 +17,7 @@ Vrchat System :
                 - trigger to swap weapon direction up/down [ toggle per definition ]
             - two handed [ configurable ]
             - grenade
-            - projectil
-                - auto compute life time , configure type [ explose affert delay , explose on impact , mix ][ do raycast for explosion for oculte damage whit colider ]
-                - add audio source and sound for flight and explosion
-            - play [_muzzleFlashPrefab] whit projectil / trace weapon for VFX
+            - fix beam rendere on tp for remote user
         - life system (in progress)
             - for player
             - for object
