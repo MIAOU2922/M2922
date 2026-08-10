@@ -1,40 +1,88 @@
-for rp project :
-    - hitbox system ( in progress)
-        - fix avatar armature have random rotation
-    - weapon system ( in progress)
-        - all type off weapon
-        - raycast / projectiles
-        - sounds
-        - relaod methode
-            - auto
-            - manual [E]
-            - manual [VR]
-        - melee
-            - trigger to swap weapon direction up/down [ toggle per definition ]
-        - two handed [ configurable ]
-    - life system (in progress)
-        - for player
-        - for object
-    - inventory system (not start)
-        - holster
-        - ui
-        - weight system
-    - véicule system (not start)
-    - buff system (in progress)
-        - apply buff / debuf , fire , heal , ect...
-    - avatar link system (not start)
-        - bind udon to parameter
+Vrchat System :
+    - for rp project :
+        - hitbox system (in progress)
+            - fix avatar armature have random rotation [ hitbox scaler issue]
 
-for other project :
-    - count system (finish)
-    - permision system (not start)
-    - keypad system (not start)
-    - log system (not start)
+        - weapon system (in progress)
+            - all type off weapon
+            - raycast / projectiles
+            - sounds
+            - relaod methode
+                - auto
+                - manual [E]
+                - manual [VR]
+                    - joystict trigger
+                    - props
+            - melee
+                - trigger to swap weapon direction up/down [ toggle per definition ]
+            - two handed [ configurable ]
+            - grenade
+            - projectil
+                - auto compute life time , configure type [ explose affert delay , explose on impact , mix ][ do raycast for explosion for oculte damage whit colider ]
+                - add audio source and sound for flight and explosion
+            - play [_muzzleFlashPrefab] whit projectil / trace weapon for VFX
+        - life system (in progress)
+            - for player
+            - for object
+
+        - inventory system (not start)
+            - holster
+            - ui
+            - weight system
+
+        - véicule system (not start)
+
+        - buff system (in progress)
+            - apply buff / debuf , fire , heal , ect...
+
+        - avatar link system (not start)
+            - bind udon to parameter
+
+    - for other map project :
+        - count system (finish)
+        - permision system (not start)
+        - keypad system (not start)
+        - log system (not start)
+        - bouncer system (not start)
+
+        - badge system (not start)
+
+        - room system (not start)
+
+        - tp system (not start)
+            - world map tp
+            - tp to player
+            - tp player to me
+
+
+        - portal system (in progress)
+            -spawn portal in runtime
+            - portal gun [side quest] (not start)
+
+
+        - miror systeme (not start)
+
+        - portal system (not start)
+
+        - day/night system (not start)
+        - meteo system (not start)
+        - season system (not start)
+
+        - git images system (not start)
+        - git list system (not start)
+
+        - vidéo player (not start)
+
+        - language system (not start)
+
+    - for other avatar project :
+        - props systeme (not start)
+
+Unity System :
+    - spline route system (not start)
 
     - day/night system (not start)
     - meteo system (not start)
     - season system (not start)
 
-    - git images system
-    - git list system
-
+    - shaders (not start)

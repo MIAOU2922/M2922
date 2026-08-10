@@ -38,6 +38,10 @@ namespace M2922.Component.Health
         [Tooltip("Player ID auquel ce HitboxSystem est lié (-1 = NPC/destructible). Défini par le système de spawn.")]
         [SerializeField] private int _boundPlayerId = -1;
 
+        [Header("=== ENTITY TYPE ===")]
+        [Tooltip("TRUE = joueur (avatar), FALSE = NPC/destructible. Défini dans le prefab. Utilisé par _PollAutoBind pour décider si on bind au joueur ou si on enregistre comme NPC.")]
+        [SerializeField] private bool _isPlayer = false;
+
         [Header("=== ENTITY ID ===")]
         [Tooltip("ID unique pour le relai réseau des NPCs (auto-assigné par le Manager). -1 = pas encore enregistré.")]
         [SerializeField] private int _entityId = -1;
@@ -53,6 +57,7 @@ namespace M2922.Component.Health
         public Collider[] HitboxColliders => _hitboxColliders;
         public int BoundPlayerId => _boundPlayerId;
         public int EntityId => _entityId;
+        public bool IsPlayer => _isPlayer;
 
         /// <summary>Lie ce HitboxSystem à un joueur spécifique. Appelé par le système de spawn (joueurs uniquement).</summary>
         public void BindToPlayer(int playerId)
@@ -129,45 +134,43 @@ namespace M2922.Component.Health
         {
             if (_boundPlayerId >= 0) return; // déjà bindé
 
-            // Tenter le bind via Networking.GetOwner (plus fiable que IsOwner en early Start)
             VRCPlayerApi owner = Networking.GetOwner(gameObject);
-            if (owner != null && owner.isLocal)
+
+            // _isPlayer gère TOUS les cas sans heuristique fragile :
+            //   _isPlayer=true  → BindToPlayer (fonctionne pour local ET remote, y compris master)
+            //   _isPlayer=false → RegisterAsNpc (objets de scène, même sur le master)
+            //   owner == null   → retry loop (ownership VRChat pas encore assignée)
+            if (owner != null)
             {
-                BindToPlayer(owner.playerId);
-                this.Log($"[HitboxSystem] Auto-bind réussi après {_bindAttempts} tentatives (id={owner.playerId})");
+                if (_isPlayer)
+                {
+                    BindToPlayer(owner.playerId);
+                    this.Log($"[HitboxSystem] Auto-bind joueur réussi après {_bindAttempts} tentatives (id={owner.playerId}, isLocal={owner.isLocal})");
 
-                // Enregistrer le DamageReceiver auprès du Manager (le Start() était trop tôt)
-                var receiver = GetComponent<M2922_DamageReceiver>();
-                if (receiver != null && Manager != null)
-                    Manager.RegisterReceiver(owner.playerId, receiver);
+                    // Enregistrer le DamageReceiver auprès du Manager (le Start() était trop tôt)
+                    var receiver = GetComponent<M2922_DamageReceiver>();
+                    if (receiver != null && Manager != null)
+                        Manager.RegisterReceiver(owner.playerId, receiver);
 
-                return;
+                    return;
+                }
+                else
+                {
+                    // NPC/destructible : enregistrer comme NPC (même sur le master)
+                    RegisterAsNpc();
+                    return;
+                }
             }
 
+            // owner == null : l'ownership VRChat n'est pas encore assignée, on réessaie
             _bindAttempts++;
             if (_bindAttempts < MAX_BIND_ATTEMPTS)
             {
-                // Réessayer dans 10 frames
                 SendCustomEventDelayedFrames("_PollAutoBind", 10);
             }
             else
             {
-                // Distinguer un hitbox de joueur distant (owned par un joueur non-master)
-                // d'un vrai NPC/destructible (objet de scène owned par le master).
-                // Sans cette distinction, les hitboxes des joueurs distants sont
-                // incorrectement enregistrés comme NPCs → le relay PvP casse.
-                owner = Networking.GetOwner(gameObject);
-                if (owner != null && !owner.isMaster)
-                {
-                    BindToPlayer(owner.playerId);
-                    this.Log($"[HitboxSystem] Remote bind to playerId={owner.playerId} after {_bindAttempts} attempts");
-                }
-                else
-                {
-                    // Échec après N tentatives → enregistrer comme NPC (fallback)
-                    this.Warning($"[HitboxSystem] Échec auto-bind après {_bindAttempts} tentatives. Enregistrement comme NPC.");
-                    RegisterAsNpc();
-                }
+                this.Warning($"[HitboxSystem] Échec auto-bind après {_bindAttempts} tentatives (owner=NULL). Vérifiez le prefab.");
             }
         }
 

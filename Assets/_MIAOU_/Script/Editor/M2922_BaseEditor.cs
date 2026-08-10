@@ -46,19 +46,19 @@ namespace M2922.Editor
 
         protected bool _isManager;
 
-        // Serialized properties
-        private SerializedProperty _propDebug;
-        private SerializedProperty _propVerboseDebug;
-        private SerializedProperty _propManager;
-        private SerializedProperty _propAutoName;
-        private SerializedProperty _propScriptName;
-        private SerializedProperty _propShowGizmo;
-        private SerializedProperty _propAutoGizmo;
-        private SerializedProperty _propGizmoOffsetY;
-        private SerializedProperty _propGizmoHeaderScale;
-        private SerializedProperty _propGizmoValueScale;
-        private SerializedProperty _propGizmoHeaderColor;
-        private SerializedProperty _propGizmoOnlyWhenSelected;
+        // Serialized properties (protected pour les classes dérivées)
+        protected SerializedProperty _propDebug;
+        protected SerializedProperty _propVerboseDebug;
+        protected SerializedProperty _propManager;
+        protected SerializedProperty _propAutoName;
+        protected SerializedProperty _propScriptName;
+        protected SerializedProperty _propShowGizmo;
+        protected SerializedProperty _propAutoGizmo;
+        protected SerializedProperty _propGizmoOffsetY;
+        protected SerializedProperty _propGizmoHeaderScale;
+        protected SerializedProperty _propGizmoValueScale;
+        protected SerializedProperty _propGizmoHeaderColor;
+        protected SerializedProperty _propGizmoOnlyWhenSelected;
 
         protected virtual void OnEnable()
         {

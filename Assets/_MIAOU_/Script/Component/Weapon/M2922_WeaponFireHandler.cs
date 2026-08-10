@@ -4,6 +4,7 @@ using VRC.SDKBase;
 using VRC.Udon;
 using M2922.Core;
 using M2922.Component.Health;
+using M2922.Component.Utils;
 
 namespace M2922.Component.Weapon
 {
@@ -644,11 +645,78 @@ namespace M2922.Component.Weapon
 
                     _beamRenderer.SetPosition(0, origin);
                     Vector3 beamEnd;
-                    RaycastHit hit;
-                    if (Physics.Raycast(origin, dir, out hit, beamRange, _beamLayerMask, QueryTriggerInteraction.Collide))
+                    RaycastHit hit = new RaycastHit();
+                    float remainingBeamRange = beamRange;
+                    Vector3 beamRayOrigin = origin;
+                    Vector3 beamRayDir = dir;
+                    bool hitSomething = false;
+
+                    // Points du LineRenderer : origin + (entry, exit)*N + final
+                    Vector3[] beamPath = new Vector3[8]; // max 3 TPs = 1 + 2*3 + 1 = 8 points
+                    int beamPathCount = 1;
+                    beamPath[0] = origin;
+
+                    // Traverse jusqu'à 3 téléporteurs successifs (portal)
+                    for (int pass = 0; pass < 4; pass++)
+                    {
+                        if (!Physics.Raycast(beamRayOrigin, beamRayDir, out hit, remainingBeamRange, _beamLayerMask, QueryTriggerInteraction.Collide))
+                            break;
+
+                        // Téléporteur : on traverse toujours.
+                        // AllowProjectiles → portal, sinon → ligne droite.
+                        M2922_Teleporter tp = hit.collider.GetComponentInParent<M2922_Teleporter>();
+                        if (tp != null)
+                        {
+                            Vector3 entryPt = hit.point;
+                            if (tp.AllowProjectiles)
+                            {
+                                Vector3 exitPoint, exitDir;
+                                if (tp.ComputeExitRay(entryPt, beamRayDir, out exitPoint, out exitDir))
+                                {
+                                    float distUsed = hit.distance + 0.01f;
+                                    remainingBeamRange -= distUsed;
+                                    if (remainingBeamRange <= 0f) break;
+
+                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = entryPt;
+                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = exitPoint;
+
+                                    beamRayOrigin = exitPoint;
+                                    beamRayDir = exitDir;
+                                }
+                                else
+                                {
+                                    float distUsed = hit.distance + 0.01f;
+                                    remainingBeamRange -= distUsed;
+                                    if (remainingBeamRange <= 0f) break;
+                                    if (beamPathCount + 1 < beamPath.Length) beamPath[beamPathCount++] = hit.point;
+                                    beamRayOrigin = hit.point + beamRayDir * 0.01f;
+                                }
+                            }
+                            else
+                            {
+                                // TP sans AllowProjectiles → traverse en ligne droite
+                                float distUsed = hit.distance + 0.01f;
+                                remainingBeamRange -= distUsed;
+                                if (remainingBeamRange <= 0f) break;
+                                beamRayOrigin = hit.point + beamRayDir * 0.01f;
+                            }
+                            continue;
+                        }
+
+                        // Vrai impact (hitbox ou mur)
+                        hitSomething = true;
+                        break;
+                    }
+
+                    if (hitSomething)
                     {
                         beamEnd = hit.point;
-                        _beamRenderer.SetPosition(1, beamEnd);
+                        if (beamPathCount < beamPath.Length) beamPath[beamPathCount++] = beamEnd;
+
+                        // Appliquer le path au LineRenderer
+                        _beamRenderer.positionCount = beamPathCount;
+                        for (int p = 0; p < beamPathCount; p++)
+                            _beamRenderer.SetPosition(p, beamPath[p]);
 
                         if (hit.collider.gameObject.layer == _hitboxLayer)
                         {
@@ -664,6 +732,7 @@ namespace M2922.Component.Weapon
                             if (didFire)
                             {
                                 PlayFireSound();
+                                SpawnMuzzleFlash();
                                 ApplyRecoilKick();
 
                                 if (_beamDamageAccum > 0f && _beamHitTarget != null)
@@ -688,7 +757,12 @@ namespace M2922.Component.Weapon
                     else
                     {
                         beamEnd = origin + dir * beamRange;
-                        _beamRenderer.SetPosition(1, beamEnd);
+                        if (beamPathCount < beamPath.Length) beamPath[beamPathCount++] = beamEnd;
+
+                        // Appliquer le path au LineRenderer
+                        _beamRenderer.positionCount = beamPathCount;
+                        for (int p = 0; p < beamPathCount; p++)
+                            _beamRenderer.SetPosition(p, beamPath[p]);
 
                         // Même sans collision, consommer une munition par pulse
                         if (_beamTimer <= 0f)
@@ -697,6 +771,7 @@ namespace M2922.Component.Weapon
                             if (didFire)
                             {
                                 PlayFireSound();
+                                SpawnMuzzleFlash();
                                 ApplyRecoilKick();
                             }
                             _beamDamageAccum = 0f;
@@ -708,7 +783,7 @@ namespace M2922.Component.Weapon
                         }
                     }
 
-                    // Sync beam visuel pour les autres joueurs
+                    // Sync beam visuel simplifié pour les autres joueurs (start→end)
                     SyncBeam(origin, beamEnd);
                 }
             }
@@ -855,7 +930,9 @@ namespace M2922.Component.Weapon
                 if (shooterId == myId) { /* skip */ }
                 else if (isNpc)
                 {
-                    // NPC/destructible : tout le monde (sauf tireur) applique
+                    // NPC/destructible : tout le monde (sauf tireur) applique.
+                    // Identifié uniquement par entityId dans le registre NPC local.
+                    // PAS de fallback PvP : _relayTargetId = -1 pour les NPCs.
                     if (Manager != null)
                     {
                         var npc = Manager.GetNpcReceiverByEntityId(entityId);
@@ -863,13 +940,9 @@ namespace M2922.Component.Weapon
                         {
                             npc.ApplyNetworkDamage(dmg, dmgType, shooter);
                         }
-                        else if (targetId == myId)
+                        else
                         {
-                            // Fallback PvP : le hitbox était enregistré comme NPC mais
-                            // le entityId ne correspond pas (ex: hitbox du master sur
-                            // un client distant). On utilise le targetId de l'owner.
-                            var receiver = Manager.GetReceiverByPlayerID(targetId);
-                            if (receiver != null) receiver.ApplyNetworkDamage(dmg, dmgType, shooter);
+                            this.Warning($"[FireHandler] OnDeserialization NPC: entityId={entityId} introuvable dans le registre local");
                         }
                     }
                 }
@@ -941,12 +1014,11 @@ namespace M2922.Component.Weapon
                 _relayEntityId = -1;
             }
             // 2. NPC/destructible (identifié par le HitboxSystem.EntityId)
-            //    On stocke aussi _relayTargetId depuis l'owner pour le fallback PvP
-            //    (cas du master dont le hitbox est incorrectement enregistré comme NPC).
+            //    _relayTargetId = -1 pour éviter le fallback PvP dans OnDeserialization().
+            //    Les NPCs sont identifiés uniquement par leur entityId dans le registre NPC local.
             else if (receiver.HitboxSystem != null && receiver.HitboxSystem.EntityId >= 0)
             {
-                VRCPlayerApi npcOwner = Networking.GetOwner(receiver.gameObject);
-                _relayTargetId = (npcOwner != null) ? npcOwner.playerId : -1;
+                _relayTargetId = -1;
                 _relayIsNpc = true;
                 _relayEntityId = receiver.HitboxSystem.EntityId;
             }
@@ -998,8 +1070,52 @@ namespace M2922.Component.Weapon
                 Vector3 dir = GetSpreadDirection(pellets);
 
                 RaycastHit hit;
-                if (Physics.Raycast(origin, dir, out hit, range, _hitscanLayerMask, QueryTriggerInteraction.Collide))
+                float remainingRange = range;
+                Vector3 rayOrigin = origin;
+                Vector3 rayDir = dir;
+
+                // Permet de traverser jusqu'à 3 téléporteurs successifs
+                for (int pass = 0; pass < 4; pass++)
                 {
+                    if (!Physics.Raycast(rayOrigin, rayDir, out hit, remainingRange, _hitscanLayerMask, QueryTriggerInteraction.Collide))
+                        break;
+
+                    // Si on tape un téléporteur, on traverse toujours.
+                    // AllowProjectiles → portal (entrée→sortie), sinon → ligne droite.
+                    M2922_Teleporter tp = hit.collider.GetComponentInParent<M2922_Teleporter>();
+                    if (tp != null)
+                    {
+                        if (tp.AllowProjectiles)
+                        {
+                            Vector3 exitPoint, exitDir;
+                            if (tp.ComputeExitRay(hit.point, rayDir, out exitPoint, out exitDir))
+                            {
+                                float distUsed = hit.distance + 0.01f;
+                                remainingRange -= distUsed;
+                                if (remainingRange <= 0f) break;
+                                rayOrigin = exitPoint;
+                                rayDir = exitDir;
+                            }
+                            else
+                            {
+                                // Pas de destination → ligne droite
+                                float distUsed = hit.distance + 0.01f;
+                                remainingRange -= distUsed;
+                                if (remainingRange <= 0f) break;
+                                rayOrigin = hit.point + rayDir * 0.01f;
+                            }
+                        }
+                        else
+                        {
+                            // TP n'accepte pas les projectiles → traverse en ligne droite
+                            float distUsed = hit.distance + 0.01f;
+                            remainingRange -= distUsed;
+                            if (remainingRange <= 0f) break;
+                            rayOrigin = hit.point + rayDir * 0.01f;
+                        }
+                        continue;
+                    }
+
                     // Vérifier que c'est bien une hitbox (bon layer)
                     if (hit.collider.gameObject.layer == _hitboxLayer)
                     {
@@ -1014,6 +1130,7 @@ namespace M2922.Component.Weapon
                             effect.transform.rotation = Quaternion.LookRotation(hit.normal);
                         }
                     }
+                    break; // On a touché quelque chose de non-téléporteur → on s'arrête
                 }
             }
         }
@@ -1121,6 +1238,31 @@ namespace M2922.Component.Weapon
             return baseRange + (_weapon.Range * 1.5f) + (_weapon.Zoom * 1.5f);
         }
 
+        /// <summary>
+        /// Calcule la durée de vie du projectile (secondes) à partir de Range et Velocity.
+        /// lifetime = multiplicateur × (portée effective / vitesse)
+        /// Rocket = ×5, Grenade = ×2
+        /// </summary>
+        private float ComputeProjectileLifetime(float projectileSpeed)
+        {
+            if (_weapon == null) return 5f;
+            if (projectileSpeed <= 0f) projectileSpeed = 20f;
+
+            // Portée effective basée sur Range (50m base + Range*1.5)
+            float effectiveRange = 50f + _weapon.Range * 1.5f;
+
+            float baseLifetime = effectiveRange / projectileSpeed;
+
+            // Multiplicateur par type : Rocket ×5, GL ×2
+            float mult = IsRocketLauncher(_weaponType) ? 5f : 2f;
+
+            float lifetime = baseLifetime * mult;
+            // Clamp entre 1.5s et 60s
+            if (lifetime < 1.5f) lifetime = 1.5f;
+            if (lifetime > 60f) lifetime = 60f;
+            return lifetime;
+        }
+
         private Vector3 GetSpreadDirection(int pellets)
         {
             Quaternion baseRot = GetMuzzleRot();
@@ -1207,7 +1349,9 @@ namespace M2922.Component.Weapon
 
             // Vitesse du projectile
             float speed = 15f + velocityStat * 0.5f;
-            float lifetime = 5f;
+
+            // Lifetime auto-computé depuis Range et Velocity
+            float lifetime = ComputeProjectileLifetime(speed);
 
             float stability = _weapon.Stability;
             float aimAssist = _weapon.AimAssistance;
@@ -1215,12 +1359,37 @@ namespace M2922.Component.Weapon
             // Gravité : GL = 2.5×, Rockets = 0.5×, autres = 1×
             float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
 
+            // Explosion config depuis la frame
+            int explTrigger = _weapon.ExplosionTriggerAsInt;
+            float explDelay = _weapon.ExplosionDelay;
+
+            // Appliquer les défauts par type si la frame n'a pas configuré explicitement
+            if (explTrigger == (int)ExplosionTrigger.Default || explTrigger < 0)
+            {
+                if (IsGrenadeLauncher(_weaponType))
+                {
+                    explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
+                    explDelay = (explDelay < 0f) ? 1f : explDelay;
+                }
+                else // RocketLauncher, RocketSidearm
+                {
+                    explTrigger = (int)ExplosionTrigger.OnImpact;
+                    explDelay = (explDelay < 0f) ? 0f : explDelay;
+                }
+            }
+            else if (explDelay < 0f)
+            {
+                // Trigger explicite mais delay pas configuré → 0 par défaut
+                explDelay = 0f;
+            }
+
             proj.Launch(pos, rot, speed,
                 directDmg, splashDmg, explRadius,
                 _weapon.DamageTypeAsInt, lifetime,
                 stability, aimAssist, velocityStat,
                 _weapon.WeaponTypeAsInt, gravityScale,
-                _localPlayer, this);
+                _localPlayer, this,
+                explTrigger, explDelay);
         }
 
         private bool IsGrenadeLauncher(WeaponType wt)
@@ -1265,21 +1434,54 @@ namespace M2922.Component.Weapon
             float blastStat = Mathf.Clamp(_weapon.BlastRadius, 0f, 100f);
             float speed = 15f + velocityStat * 0.5f;
             float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
-            float lifetime = 5f;
+            float lifetime = ComputeProjectileLifetime(speed);
             float stability = _weapon.Stability;
             float aimAssist = _weapon.AimAssistance;
             float gravityScale = IsGrenadeLauncher(_weaponType) ? 2.5f : (IsRocketLauncher(_weaponType) ? 0.5f : 1f);
+
+            // Explosion config
+            int explTrigger = _weapon.ExplosionTriggerAsInt;
+            float explDelay = _weapon.ExplosionDelay;
+
+            if (explTrigger == (int)ExplosionTrigger.Default || explTrigger < 0)
+            {
+                if (IsGrenadeLauncher(_weaponType))
+                {
+                    explTrigger = (int)ExplosionTrigger.OnImpactAndDeath;
+                    explDelay = (explDelay < 0f) ? 1f : explDelay;
+                }
+                else
+                {
+                    explTrigger = (int)ExplosionTrigger.OnImpact;
+                    explDelay = (explDelay < 0f) ? 0f : explDelay;
+                }
+            }
+            else if (explDelay < 0f)
+            {
+                explDelay = 0f;
+            }
 
             proj.LaunchVisual(pos, rot, speed,
                 explRadius, lifetime,
                 stability, aimAssist, velocityStat,
                 _weapon.WeaponTypeAsInt, gravityScale,
-                this);
+                this,
+                explTrigger, explDelay);
         }
 
         // ===================================================
         // HELPERS
         // ===================================================
+
+        /// <summary>
+        /// True si ce collider est un téléporteur qui laisse passer les projectiles/rayons.
+        /// </summary>
+        private bool IsTeleporterCollider(Collider col)
+        {
+            if (col == null) return false;
+            M2922_Teleporter tp = col.GetComponentInParent<M2922_Teleporter>();
+            return tp != null && tp.AllowProjectiles;
+        }
 
         private bool CanFire()
         {

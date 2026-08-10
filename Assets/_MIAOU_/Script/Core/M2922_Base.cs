@@ -191,6 +191,12 @@ namespace M2922.Core
                 SetDebugFlags();
             }
         }
+        protected virtual void LateUpdate()
+        {
+        }
+        protected virtual void PostLateUpdate()
+        {
+        }
         private void SetDebugFlags()
         {
             if (Manager == null || Manager == this.gameObject) return;

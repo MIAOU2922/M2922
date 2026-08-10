@@ -41,7 +41,7 @@ namespace M2922.Component.Utils
             if (!_useLateUpdate) LookAtCamera();
         }
 
-        public override void PostLateUpdate()
+        protected override void PostLateUpdate()
         {
             if (_useLateUpdate) LookAtCamera();
         }

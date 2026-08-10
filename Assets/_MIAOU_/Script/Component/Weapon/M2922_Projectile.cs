@@ -4,6 +4,7 @@ using VRC.SDKBase;
 using VRC.Udon;
 using M2922.Core;
 using M2922.Component.Health;
+using M2922.Component.Utils;
 
 namespace M2922.Component.Weapon
 {
@@ -51,6 +52,38 @@ namespace M2922.Component.Weapon
         [Header("=== POOLING ===")]
         private M2922_WeaponFireHandler _pool;
 
+        [Header("=== SFX ===")]
+        [Tooltip("AudioSource pour les sons. Si null, sera cherché sur ce GameObject.")]
+        [SerializeField] private AudioSource _audioSource;
+        [Tooltip("Son de vol en boucle. Joué tant que le projectile est actif.")]
+        [SerializeField] private AudioClip _flightSound;
+        [Tooltip("Son d'explosion (one-shot).")]
+        [SerializeField] private AudioClip _explosionSound;
+        [Tooltip("Volume du son de vol (0-1).")]
+        [SerializeField] private float _flightVolume = 0.4f;
+        [Tooltip("Volume du son d'explosion (0-1).")]
+        [SerializeField] private float _explosionVolume = 0.8f;
+
+        [Header("=== EXPLOSION BEHAVIOR ===")]
+        /// <summary>Déclencheur d'explosion (OnImpact, OnImpactAndDeath, OnDeath).</summary>
+        private int _explosionTrigger = 0;
+        /// <summary>Délai en secondes après le déclencheur avant d'exploser.</summary>
+        private float _explosionDelay = 0f;
+        /// <summary>Timer interne pour le délai d'explosion.</summary>
+        private float _explosionDelayTimer = 0f;
+        /// <summary>True quand le délai est en cours.</summary>
+        private bool _explosionPending = false;
+        /// <summary>Position figée pendant le délai (pour les grenades).</summary>
+        private Vector3 _pendingExplosionPos;
+        /// <summary>True si le projectile est mort (durée de vie expirée).</summary>
+        private bool _isDead = false;
+
+        [Header("=== OCCLUSION ===")]
+        [Tooltip("Layers considérés comme obstacles pour l'explosion (murs, sol). Hitbox/UI/Pickup exclus.")]
+        [SerializeField] private LayerMask _obstacleLayerMask = ~0;
+        [Tooltip("Nom du layer obstacle principal.")]
+        [SerializeField] private string _obstacleLayerName = "Default";
+
         [Header("=== NETWORK ===")]
         /// <summary>Quand true, le projectile est visuel uniquement (spawné par un client distant).
         /// Les dégâts ne sont PAS appliqués — seul le VFX et la trajectoire sont joués.</summary>
@@ -65,6 +98,15 @@ namespace M2922.Component.Weapon
         // --- Propriétés ---
         public bool IsActive { get { return _active; } }
 
+        /// <summary>
+        /// Applique une rotation à la vélocité du projectile (utilisé par les téléporteurs
+        /// avec _alignRotation pour conserver le mouvement relatif après un portal).
+        /// </summary>
+        public void RotateVelocity(Quaternion rotation)
+        {
+            _velocity = rotation * _velocity;
+        }
+
         // ===================================================
         // INIT (appelé par le pool)
         // ===================================================
@@ -76,12 +118,15 @@ namespace M2922.Component.Weapon
         /// <param name="aimAssist">Stat AimAssistance 0-100 (cône d'aide à la visée).</param>
         /// <param name="velocityStat">Stat Velocity 0-100 (réduit le cône d'aim assist).</param>
         /// <param name="gravityScale">Multiplicateur de gravité (0.5=rocket, 2.5=GL, 1=autres).</param>
+        /// <param name="explosionTrigger">Déclencheur d'explosion (ExplosionTrigger cast to int).</param>
+        /// <param name="explosionDelay">Délai avant explosion après déclencheur (secondes).</param>
         public void Launch(Vector3 position, Quaternion rotation, float speed,
             float directDmg, float splashDmg, float explRadius,
             int damageType, float lifetime,
             float stability, float aimAssist, float velocityStat,
             int weaponType, float gravityScale,
-            VRCPlayerApi owner, M2922_WeaponFireHandler pool)
+            VRCPlayerApi owner, M2922_WeaponFireHandler pool,
+            int explosionTrigger, float explosionDelay)
         {
             transform.SetPositionAndRotation(position, rotation);
             _speed = speed;
@@ -104,6 +149,21 @@ namespace M2922.Component.Weapon
             _velocity = rotation * Vector3.forward * _speed;
             _initialDirection = _velocity.normalized;
             _visualOnly = false;
+            _explosionTrigger = explosionTrigger;
+            _explosionDelay = explosionDelay;
+            _explosionDelayTimer = 0f;
+            _explosionPending = false;
+            _isDead = false;
+
+            // Flight sound loop
+            if (_audioSource != null && _flightSound != null)
+            {
+                _audioSource.clip = _flightSound;
+                _audioSource.loop = true;
+                _audioSource.volume = _flightVolume;
+                _audioSource.Play();
+            }
+
             gameObject.SetActive(true);
         }
 
@@ -115,7 +175,8 @@ namespace M2922.Component.Weapon
             float explRadius, float lifetime,
             float stability, float aimAssist, float velocityStat,
             int weaponType, float gravityScale,
-            M2922_WeaponFireHandler pool)
+            M2922_WeaponFireHandler pool,
+            int explosionTrigger, float explosionDelay)
         {
             transform.SetPositionAndRotation(position, rotation);
             _speed = speed;
@@ -137,6 +198,21 @@ namespace M2922.Component.Weapon
             _velocity = rotation * Vector3.forward * _speed;
             _initialDirection = _velocity.normalized;
             _visualOnly = true;
+            _explosionTrigger = explosionTrigger;
+            _explosionDelay = explosionDelay;
+            _explosionDelayTimer = 0f;
+            _explosionPending = false;
+            _isDead = false;
+
+            // Flight sound loop
+            if (_audioSource != null && _flightSound != null)
+            {
+                _audioSource.clip = _flightSound;
+                _audioSource.loop = true;
+                _audioSource.volume = _flightVolume;
+                _audioSource.Play();
+            }
+
             gameObject.SetActive(true);
         }
 
@@ -145,6 +221,11 @@ namespace M2922.Component.Weapon
             _active = false;
             _elapsed = 0f;
             _velocity = Vector3.zero;
+            _explosionPending = false;
+            _explosionDelayTimer = 0f;
+            _isDead = false;
+            if (_audioSource != null)
+                _audioSource.Stop();
             if (_rigidbody != null)
                 _rigidbody.velocity = Vector3.zero;
             gameObject.SetActive(false);
@@ -162,6 +243,10 @@ namespace M2922.Component.Weapon
             if (_rigidbody == null)
                 this.Error("[Projectile] Aucun Rigidbody !");
             _colliderReady = cols.Length > 0;
+
+            // AudioSource : utiliser celui assigné ou en trouver un sur ce GO
+            if (_audioSource == null)
+                _audioSource = GetComponent<AudioSource>();
         }
 
         // ===================================================
@@ -172,10 +257,42 @@ namespace M2922.Component.Weapon
         {
             if (!_active) return;
 
+            // --- Explosion en attente (délai après impact) ---
+            if (_explosionPending)
+            {
+                _explosionDelayTimer -= Time.deltaTime;
+                if (_explosionDelayTimer <= 0f)
+                {
+                    _explosionPending = false;
+                    ExplodeInternal();
+                }
+                return; // Figé pendant le délai
+            }
+
+            // --- Mort naturelle (durée de vie expirée) ---
             _elapsed += Time.deltaTime;
             if (_elapsed >= _lifetime)
             {
-                ReturnToPool();
+                _isDead = true;
+                // OnImpactAndDeath ou OnDeath : exploser à la mort
+                if (_explosionTrigger == (int)ExplosionTrigger.OnImpactAndDeath
+                    || _explosionTrigger == (int)ExplosionTrigger.OnDeath)
+                {
+                    if (_explosionDelay > 0f)
+                    {
+                        // Délai avant explosion après la mort (grenade)
+                        StartExplosionDelay(transform.position);
+                    }
+                    else
+                    {
+                        ExplodeInternal();
+                    }
+                }
+                else
+                {
+                    // OnImpact : pas d'explosion à la mort, retour au pool
+                    ReturnToPool();
+                }
                 return;
             }
 
@@ -257,6 +374,13 @@ namespace M2922.Component.Weapon
         private void OnTriggerEnter(Collider other)
         {
             if (!_active) return;
+            if (_explosionPending) return; // Déjà en attente d'explosion
+
+            // Téléporteur : ne jamais exploser au contact.
+            // Le téléporteur décide lui-même s'il tp ou non selon _allowProjectiles.
+            M2922_Teleporter tp = other.GetComponentInParent<M2922_Teleporter>();
+            if (tp != null)
+                return;
 
             // Hitbox : appliquer les dégâts directs (sauf si visuel-only)
             if (!_visualOnly && other.gameObject.layer == _hitboxLayer)
@@ -294,23 +418,62 @@ namespace M2922.Component.Weapon
                 }
             }
 
-            // Exploser au contact de n'importe quoi (hitbox, sol, mur...)
-            Explode();
+            // Exploser au contact (avec délai si configuré)
+            if (_explosionDelay > 0f)
+                StartExplosionDelay(transform.position);
+            else
+                ExplodeInternal();
         }
 
         /// <summary>Collision physique (sol, murs, objets non-trigger).</summary>
         private void OnCollisionEnter(Collision collision)
         {
             if (!_active) return;
-            Explode();
+            if (_explosionPending) return;
+
+            // Téléporteur : ne jamais exploser au contact.
+            M2922_Teleporter tp = collision.collider.GetComponentInParent<M2922_Teleporter>();
+            if (tp != null)
+                return;
+
+            if (_explosionDelay > 0f)
+                StartExplosionDelay(transform.position);
+            else
+                ExplodeInternal();
         }
 
-        private void Explode()
+        /// <summary>
+        /// Démarre le délai avant explosion. Le projectile est figé à la position donnée.
+        /// </summary>
+        private void StartExplosionDelay(Vector3 freezePos)
+        {
+            _explosionPending = true;
+            _explosionDelayTimer = _explosionDelay;
+            _pendingExplosionPos = freezePos;
+            _velocity = Vector3.zero;
+            if (_rigidbody != null)
+            {
+                _rigidbody.velocity = Vector3.zero;
+                _rigidbody.isKinematic = true;
+            }
+            transform.position = freezePos;
+
+            // Couper le son de vol
+            if (_audioSource != null)
+                _audioSource.Stop();
+        }
+
+        /// <summary>
+        /// Explosion interne : dégâts de zone avec occlusion par raycast + VFX + SFX.
+        /// </summary>
+        private void ExplodeInternal()
         {
             // Dégâts de zone : toutes les hitboxes dans le rayon (sauf si visuel-only)
             if (!_visualOnly && _splashDamage > 0f && _explosionRadius > 0f)
             {
-                Collider[] hits = Physics.OverlapSphere(transform.position, _explosionRadius,
+                Vector3 explCenter = _explosionPending ? _pendingExplosionPos : transform.position;
+
+                Collider[] hits = Physics.OverlapSphere(explCenter, _explosionRadius,
                     1 << _hitboxLayer, QueryTriggerInteraction.Collide);
 
                 // Déduplication : max 100 receivers uniques (pas de List<T> en Udon)
@@ -319,7 +482,64 @@ namespace M2922.Component.Weapon
 
                 foreach (var col in hits)
                 {
-                    float dist = Vector3.Distance(transform.position, col.transform.position);
+                    // --- OCCLUSION : raycast du centre d'explosion vers la hitbox ---
+                    // Les hitbox, UI, pickups, téléporteurs ne sont PAS des obstacles.
+                    Vector3 toTarget = col.transform.position - explCenter;
+                    float dist = toTarget.magnitude;
+                    Vector3 dir = toTarget.normalized;
+
+                    // Raycast avec traversée des téléporteurs (portal, max 3)
+                    float remainingDist = dist;
+                    Vector3 rayStart = explCenter;
+                    Vector3 rayDir = dir;
+                    bool blocked = false;
+                    for (int pass = 0; pass < 4; pass++)
+                    {
+                        RaycastHit occHit;
+                        if (!Physics.Raycast(rayStart, rayDir, out occHit, remainingDist, _obstacleLayerMask, QueryTriggerInteraction.Ignore))
+                            break; // Rien touché → pas bloqué
+
+                        // Téléporteur : on traverse toujours.
+                        // AllowProjectiles → portal, sinon → ligne droite.
+                        M2922_Teleporter tp = occHit.collider.GetComponentInParent<M2922_Teleporter>();
+                        if (tp != null)
+                        {
+                            if (tp.AllowProjectiles)
+                            {
+                                Vector3 exitPoint, exitDir;
+                                if (tp.ComputeExitRay(occHit.point, rayDir, out exitPoint, out exitDir))
+                                {
+                                    float used = occHit.distance + 0.01f;
+                                    remainingDist -= used;
+                                    if (remainingDist <= 0f) break;
+                                    rayStart = exitPoint;
+                                    rayDir = exitDir;
+                                }
+                                else
+                                {
+                                    float used = occHit.distance + 0.01f;
+                                    remainingDist -= used;
+                                    if (remainingDist <= 0f) break;
+                                    rayStart = occHit.point + rayDir * 0.01f;
+                                }
+                            }
+                            else
+                            {
+                                // TP sans AllowProjectiles → traverse en ligne droite
+                                float used = occHit.distance + 0.01f;
+                                remainingDist -= used;
+                                if (remainingDist <= 0f) break;
+                                rayStart = occHit.point + rayDir * 0.01f;
+                            }
+                            continue;
+                        }
+
+                        // Vrai obstacle → bloqué
+                        blocked = true;
+                        break;
+                    }
+                    if (blocked) continue;
+
                     float falloff = 1f - Mathf.Clamp01(dist / _explosionRadius);
                     float dmg = _splashDamage * Mathf.Lerp(0.3f, 1f, falloff);
 
@@ -368,15 +588,28 @@ namespace M2922.Component.Weapon
                 }
             }
 
+            // Explosion SFX
+            if (_audioSource != null && _explosionSound != null)
+            {
+                _audioSource.Stop();
+                _audioSource.PlayOneShot(_explosionSound, _explosionVolume);
+            }
+
             // VFX d'explosion
+            Vector3 explPos = _explosionPending ? _pendingExplosionPos : transform.position;
             if (_explosionVfxPrefab != null)
             {
                 GameObject vfx = Instantiate(_explosionVfxPrefab);
-                vfx.transform.position = transform.position;
+                vfx.transform.position = explPos;
                 vfx.transform.rotation = Quaternion.identity;
                 Destroy(vfx, _explosionVfxLifetime);
             }
 
+            // Reset rigidbody kinematic state
+            if (_rigidbody != null)
+                _rigidbody.isKinematic = false;
+
+            _explosionPending = false;
             ReturnToPool();
         }
 
@@ -392,6 +625,12 @@ namespace M2922.Component.Weapon
             // Résoudre le layer hitbox depuis le nom
             _hitboxLayer = UnityEngine.LayerMask.NameToLayer(_hitboxLayerName);
             if (_hitboxLayer < 0) _hitboxLayer = 8;
+
+            // Obstacle layer mask : tout SAUF hitbox, UI, Pickup, Player, etc.
+            // On part de ~0 (tout) et on exclut les layers non-obstacles.
+            int obstacleLayer = UnityEngine.LayerMask.NameToLayer(_obstacleLayerName);
+            if (obstacleLayer < 0) obstacleLayer = 0; // Default
+            _obstacleLayerMask = (1 << obstacleLayer);
 
             // S'assurer que les deux colliders existent (trigger + non-trigger)
             var cols = GetComponents<Collider>();

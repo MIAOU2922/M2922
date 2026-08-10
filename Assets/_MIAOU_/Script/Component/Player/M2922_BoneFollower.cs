@@ -52,7 +52,7 @@ namespace M2922.Component.Player
                 _targetPlayer = Networking.GetOwner(gameObject);
         }
 
-        public override void PostLateUpdate()
+        protected override void PostLateUpdate()
         {
             if (_isInEditor) return;
             if (_targetPlayer == null) { ResolveTarget(); return; }

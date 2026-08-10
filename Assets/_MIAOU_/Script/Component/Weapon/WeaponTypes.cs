@@ -92,6 +92,21 @@ namespace M2922.Component.Weapon
     }
 
     /// <summary>
+    /// Déclencheur d'explosion pour les projectiles (roquettes, grenades).
+    /// </summary>
+    public enum ExplosionTrigger
+    {
+        /// <summary>Déterminé automatiquement par le type d'arme.</summary>
+        Default = -1,
+        /// <summary>Explose à l'impact uniquement, PAS à la mort (rocket par défaut).</summary>
+        OnImpact = 0,
+        /// <summary>Explose à l'impact ET à la mort (grenade par défaut).</summary>
+        OnImpactAndDeath = 1,
+        /// <summary>Explose uniquement quand la durée de vie expire.</summary>
+        OnDeath = 2
+    }
+
+    /// <summary>
     /// Mapping statique WeaponType → FireMode + burst count.
     /// </summary>
     public static class FireModeMapping

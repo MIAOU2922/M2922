@@ -50,7 +50,7 @@ namespace M2922.Component.Utils
         public Vector3 localOffset = Vector3.zero;
 
         [Header("=== UPDATE MODE ===")]
-        [Tooltip("Si coché, met à jour en continu dans Update(). Décocher pour appel manuel.")]
+        [Tooltip("Si coché, met à jour en continu dans LateUpdate(). Décocher pour appel manuel.")]
         public bool autoUpdate = true;
 
         // Privé
@@ -69,10 +69,9 @@ namespace M2922.Component.Utils
             _capsuleCollider = GetComponent<CapsuleCollider>();
         }
 
-        protected override void Update()
+        protected override void PostLateUpdate()
         {
-            base.Update();
-
+            base.PostLateUpdate();
             if (!autoUpdate) return;
 
             UpdateCollider();

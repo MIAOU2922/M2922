@@ -75,7 +75,7 @@ namespace M2922.Component.Health
         private void OnDestroy() { ClearAll(); }
         private void OnDisable() { ClearAll(); }
 
-        private void LateUpdate()
+        protected override void LateUpdate()
         {
             bool shouldShow = ComputeShouldShow();
             for (int i = 0; i < _createdCount; i++)

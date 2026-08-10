@@ -87,13 +87,27 @@ namespace M2922.Component.Weapon.Editor
                 EditorGUILayout.LabelField("Airborne", FV("_bakedFrameAirborneEffectiveness").ToString("F1"));
                 EditorGUILayout.LabelField("Reload Style", ((ReloadStyle)IV("_bakedFrameReloadStyle")).ToString());
 
+                // ---- EXPLOSION CONFIG ---- 
+                int explTrig = IV("_bakedFrameExplosionTrigger");
+                float explDelay = FV("_bakedFrameExplosionDelay");
+                if (explTrig != 0 || explDelay > 0f)
+                {
+                    Color oldExp = GUI.color;
+                    GUI.color = new Color(1f, 0.7f, 0.3f);
+                    EditorGUILayout.LabelField("Explosion", $"{(ExplosionTrigger)explTrig}  delay:{explDelay:F1}s");
+                    GUI.color = oldExp;
+                }
+
                 // ---- LAUNCHER STATS (si BlastRadius > 0) ----
                 float blastStat = FV("_bakedFrameBlastRadius");
                 float velStat = FV("_bakedFrameVelocity");
                 if (blastStat > 0f)
                 {
                     EditorGUILayout.Space();
+                    Color oldHeader = GUI.color;
+                    GUI.color = new Color(1f, 0.6f, 0.2f);
                     EditorGUILayout.LabelField("=== LAUNCHER STATS ===", EditorStyles.boldLabel);
+                    GUI.color = oldHeader;
 
                     float launcherMult = GetLauncherMult((WeaponType)IV("_bakedWeaponType"));
                     float launcherBaseImpact = baseImpact * launcherMult;
@@ -107,6 +121,14 @@ namespace M2922.Component.Weapon.Editor
                     float explRadius = Mathf.Lerp(2.0f, 8.0f, blastStat / 100f);
                     float projSpeed = 15f + velStat * 0.5f;
 
+                    // Lifetime / distance théorique
+                    float projEffRange = 50f + baseRange * 1.5f;
+                    float projBaseLifetime = projSpeed > 0f ? projEffRange / projSpeed : 5f;
+                    // Multiplicateur par type : Rocket ×5, GL ×2
+                    float projLifetimeMult = (wt == WeaponType.RocketLauncher || wt == WeaponType.RocketSidearm) ? 5f : 2f;
+                    float projLifetime = Mathf.Clamp(projBaseLifetime * projLifetimeMult, 1.5f, 60f);
+                    float projMaxDist = projSpeed * projLifetime;
+
                     Color old = GUI.color;
                     GUI.color = new Color(1f, 0.7f, 0.3f);
                     EditorGUILayout.LabelField("Base (Impact × Mult)", $"{baseImpact:F1} × {launcherMult:F1} = {launcherBaseImpact:F1}");
@@ -114,6 +136,7 @@ namespace M2922.Component.Weapon.Editor
                     EditorGUILayout.LabelField("Splash Damage", $"{splashDmg:F1}  (ratio: {splashRatio:P0})");
                     EditorGUILayout.LabelField("Explosion Radius", $"{explRadius:F1}m");
                     EditorGUILayout.LabelField("Projectile Speed", $"{projSpeed:F0} m/s");
+                    EditorGUILayout.LabelField("Lifetime / Distance", $"{projLifetime:F1}s  →  {projMaxDist:F0}m  (×{projLifetimeMult:F0}, portée: {projEffRange:F0}m)");
                     EditorGUILayout.LabelField("Blast Radius (stat)", $"{blastStat:F1}");
                     EditorGUILayout.LabelField("Velocity (stat)", $"{velStat:F1}");
                     GUI.color = old;
@@ -193,6 +216,15 @@ namespace M2922.Component.Weapon.Editor
                     float explRadius = Mathf.Lerp(2.0f, 8.0f, previewBlast / 100f);
                     float projSpeed = 15f + previewVel * 0.5f;
 
+                    // Lifetime / distance théorique
+                    float projEffRange = 50f + previewRange * 1.5f;
+                    float projBaseLifetime = projSpeed > 0f ? projEffRange / projSpeed : 5f;
+                    // Multiplicateur par type : Rocket ×5, GL ×2
+                    WeaponType previewWt = (WeaponType)IV("_bakedWeaponType");
+                    float projLifetimeMult = (previewWt == WeaponType.RocketLauncher || previewWt == WeaponType.RocketSidearm) ? 5f : 2f;
+                    float projLifetime = Mathf.Clamp(projBaseLifetime * projLifetimeMult, 1.5f, 60f);
+                    float projMaxDist = projSpeed * projLifetime;
+
                     EditorGUILayout.Space();
                     GUI.color = new Color(1f, 0.6f, 0.1f);
                     EditorGUILayout.LabelField("Base (Impact × Mult)", $"{previewImpact:F1} × {launcherMult:F1} = {launcherBase:F1}");
@@ -200,6 +232,7 @@ namespace M2922.Component.Weapon.Editor
                     EditorGUILayout.LabelField("Splash Dmg (preview)", $"{splashDmg:F1}");
                     EditorGUILayout.LabelField("Expl. Radius (preview)", $"{explRadius:F1}m");
                     EditorGUILayout.LabelField("Proj Speed (preview)", $"{projSpeed:F0} m/s");
+                    EditorGUILayout.LabelField("Lifetime / Dist. (preview)", $"{projLifetime:F1}s  →  {projMaxDist:F0}m  (×{projLifetimeMult:F0}, portée: {projEffRange:F0}m)");
                     GUI.color = oldColor;
                 }
             }
@@ -246,6 +279,8 @@ namespace M2922.Component.Weapon.Editor
                 SetF("_bakedFrameVelocity", fs.Velocity);
                 SetF("_bakedFrameAccuracy", fs.Accuracy);
                 SetI("_bakedFrameReloadStyle", (int)def.Frame.ReloadStyle);
+                SetI("_bakedFrameExplosionTrigger", (int)def.Frame.ExplosionTrigger);
+                SetF("_bakedFrameExplosionDelay", def.Frame.ExplosionDelay);
             }
 
             BakePerkPool(def.PerkColumn1Pool, "_bakedPerk1PoolNames", "_bakedPerk1PoolStats", S);
