@@ -40,11 +40,40 @@ namespace M2922.Component.Health
         [Tooltip("ShowAll = toujours visible | HideLocal = caché si le GO nous appartient | HideAll = toujours caché")]
         [SerializeField] private HitboxDebugVisibility _visibilityMode = HitboxDebugVisibility.ShowAll;
 
+        [Header("=== PERFORMANCE ===")]
+        [Tooltip("Override du FrameSkipCount de base (50). 30 = debug vis ~2×/sec.")]
+        [SerializeField] private int _debugVisFrameSkip = 30;
+        protected override int FrameSkipCount => _debugVisFrameSkip;
+        [Tooltip("Désactiver complètement ce composant en runtime (production).")]
+        [SerializeField] private bool _runtimeDisabled = false;
+
         /// <summary>Mode de visibilité des meshes debug. Modifiable runtime.</summary>
         public HitboxDebugVisibility VisibilityMode
         {
             get => _visibilityMode;
-            set { _visibilityMode = value; ApplyVisibility(); }
+            set
+            {
+                _visibilityMode = value;
+                if (_visibilityMode == HitboxDebugVisibility.HideAll)
+                    ClearAll(); // détruit TOUT pour 0 perf
+                else
+                {
+                    if (_createdCount == 0) Rebuild();
+                    else ApplyVisibility();
+                }
+            }
+        }
+
+        /// <summary>Désactive/active le visualiseur en runtime (perf).</summary>
+        public bool RuntimeDisabled
+        {
+            get => _runtimeDisabled;
+            set
+            {
+                _runtimeDisabled = value;
+                if (_runtimeDisabled) ClearAll();
+                else if (_createdCount == 0) Rebuild();
+            }
         }
 
         private GameObject[] _created = new GameObject[0];
@@ -61,29 +90,43 @@ namespace M2922.Component.Health
             if (_hitboxSystem == null)
                 _hitboxSystem = GetComponent<M2922_HitboxSystem>();
 
-            // Rebuild immédiat — HitboxCount lit le tableau sérialisé donc il est
-            // déjà disponible (ne dépend plus du Start() de HitboxSystem).
-            Rebuild();
+            // Rebuild immédiat (sauf si HideAll : rien à afficher)
+            if (_visibilityMode != HitboxDebugVisibility.HideAll)
+                Rebuild();
 
             // Filet de sécurité : si les prefabs n'étaient pas encore assignés
             // (scène chargée dynamiquement), on réessaie dans 2 frames.
-            if (_createdCount == 0)
+            if (_createdCount == 0 && _visibilityMode != HitboxDebugVisibility.HideAll)
                 SendCustomEventDelayedFrames("_DelayedRebuild", 2);
         }
 
         /// <summary>Rebuild différé (filet de sécurité).</summary>
         public void _DelayedRebuild()
         {
-            if (_createdCount == 0)
+            if (_createdCount == 0 && _visibilityMode != HitboxDebugVisibility.HideAll)
                 Rebuild();
         }
 
         private void OnDestroy() { ClearAll(); }
         private void OnDisable() { ClearAll(); }
 
+        /// <summary>
+        /// PERFORMANCE: LateUpdate tourne à fréquence réduite (_updateEveryNFrames).\n        /// En production, mettre _runtimeDisabled=true ou _visibilityMode=HideAll.\n        /// </summary>
         protected override void LateUpdate()
         {
+            // ── Désactivation complète runtime (production) ──
+            if (_runtimeDisabled) return;
+
+            // ── HideAll : meshes détruits, rien à faire ──
+            if (_createdCount == 0) return;
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
+            if (!ShouldUpdate()) return;
+
+            // ── Visibilité : cache le résultat (GetOwner est un appel réseau) ──
             bool shouldShow = ComputeShouldShow();
+            if (!shouldShow) return; // early-out si tout caché
+
             for (int i = 0; i < _createdCount; i++)
             {
                 GameObject vis = _created[i];
@@ -170,9 +213,6 @@ namespace M2922.Component.Health
                 _createdCount++;
             }
 
-            // Appliquer la visibilité initiale
-            ApplyVisibility();
-
             // --- COLLIDER DE PROXIMITÉ ---
             Collider proxCol = _hitboxSystem.ProximityCollider;
             if (proxCol != null && _proximityMaterial != null)
@@ -193,6 +233,9 @@ namespace M2922.Component.Health
                     if (mr != null) mr.material = _proximityMaterial;
                 }
             }
+
+            // Appliquer la visibilité APRÈS avoir TOUT créé (hitboxes + proximity)
+            ApplyVisibility();
 
             Debug.Log($"[HitboxDebugVisualizer] {_createdCount}/{count} hitbox(es) visualisées + proximity={_proximityVis != null}.", this);
         }
@@ -217,9 +260,19 @@ namespace M2922.Component.Health
             }
         }
 
-        /// <summary>Applique la visibilité à tous les meshes créés.</summary>
+        /// <summary>
+        /// Applique la visibilité à tous les meshes créés.
+        /// HideAll → détruit TOUT (0 perf). ShowAll/HideLocal → toggle mr.enabled.
+        /// </summary>
         private void ApplyVisibility()
         {
+            // HideAll : on détruit tout pour 0 coût CPU/mémoire
+            if (_visibilityMode == HitboxDebugVisibility.HideAll)
+            {
+                ClearAll();
+                return;
+            }
+
             bool shouldShow = ComputeShouldShow();
             for (int i = 0; i < _createdCount; i++)
             {

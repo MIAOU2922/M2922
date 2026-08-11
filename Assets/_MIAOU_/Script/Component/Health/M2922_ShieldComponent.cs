@@ -19,6 +19,9 @@ namespace M2922.Component.Health
         [Header("=== REGEN ===")]
         [SerializeField] private float _regenPerSecond = 5f;
         [SerializeField] private float _regenDelay = 5f;
+        [Tooltip("Override du FrameSkipCount de base (50). 5 = regen vérifiée 5× moins souvent.")]
+        [SerializeField] private int _shieldFrameSkip = 5;
+        protected override int FrameSkipCount => _shieldFrameSkip;
         private float _lastHitTime = -999f;
         /// <summary>Contrôle runtime de la regen (désactivée pendant la mort).</summary>
         private bool _regenEnabled = true;
@@ -40,9 +43,17 @@ namespace M2922.Component.Health
         protected override void Update()
         {
             base.Update();
-            if (_regenEnabled && Time.time - _lastHitTime > _regenDelay && _currentShield < _maxShield)
+
+            // ── EARLY-OUT : regen désactivée ou shield déjà plein ──
+            if (!_regenEnabled || _currentShield >= _maxShield) return;
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
+            if (!ShouldUpdate()) return;
+
+            if (Time.time - _lastHitTime > _regenDelay)
             {
-                _currentShield = Mathf.Min(_maxShield, _currentShield + _regenPerSecond * Time.deltaTime);
+                float regenAmount = _regenPerSecond * Time.deltaTime * FrameSkipCount;
+                _currentShield = Mathf.Min(_maxShield, _currentShield + regenAmount);
                 if (ShouldSync()) RequestSerialization();
             }
         }

@@ -16,6 +16,11 @@ namespace M2922.Component.Modifier
         [Header("=== MODIFIERS ===")]
         [SerializeField] private int _maxModifiers = 16;
 
+        [Header("=== PERFORMANCE ===")]
+        [Tooltip("Override du FrameSkipCount de base (50). 10 = cleanup ~6×/sec.")]
+        [SerializeField] private int _cleanEveryNFrames = 10;
+        protected override int FrameSkipCount => _cleanEveryNFrames;
+
         // Stockage arrays parallèles
         private int[]       _modifierTypes;       // (int)ModifierType
         private ModifierMode[] _modifierModes;    // Additive ou Multiplicative
@@ -43,6 +48,13 @@ namespace M2922.Component.Modifier
         protected override void Update()
         {
             base.Update();
+
+            // ── EARLY-OUT : aucun modifier actif → rien à nettoyer ──
+            if (_activeCount == 0) return;
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
+            if (!ShouldUpdate()) return;
+
             CleanExpired();
         }
 

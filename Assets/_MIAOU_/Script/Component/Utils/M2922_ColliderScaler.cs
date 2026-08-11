@@ -69,7 +69,7 @@ namespace M2922.Component.Utils
             _capsuleCollider = GetComponent<CapsuleCollider>();
         }
 
-        protected override void PostLateUpdate()
+        public override void PostLateUpdate()
         {
             base.PostLateUpdate();
             if (!autoUpdate) return;

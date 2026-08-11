@@ -24,6 +24,11 @@ namespace M2922.Component.Health
         [SerializeField] private float _respawnDelay = 3f;
         [SerializeField] private Transform _respawnPoint;
 
+        [Header("=== PERFORMANCE ===")]
+        [Tooltip("Override du FrameSkipCount de base (50). 10 = death check ~6×/sec.")]
+        [SerializeField] private int _deathFrameSkip = 10;
+        protected override int FrameSkipCount => _deathFrameSkip;
+
         private bool _isDead = false;
         private float _deathTime = 0f;
         private float _respawnedTime = -999f; // période de grâce anti-re-death
@@ -46,6 +51,14 @@ namespace M2922.Component.Health
         protected override void Update()
         {
             base.Update();
+
+            // ── EARLY-OUT : rien à faire si pas mort et pas d'autoRespawn ──
+            if (!_isDead && !_autoRespawn) return;
+            // ── EARLY-OUT : mort sans autoRespawn → rien à vérifier ──
+            if (_isDead && !_autoRespawn) return;
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
+            if (!ShouldUpdate()) return;
 
             // Seul le propriétaire de l'entité traite sa mort/respawn.
             if (!Networking.IsOwner(gameObject)) return;

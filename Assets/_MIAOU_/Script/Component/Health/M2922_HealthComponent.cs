@@ -21,6 +21,9 @@ namespace M2922.Component.Health
         [SerializeField] private bool _enableRegen = false;
         [SerializeField] private float _regenPerSecond = 1f;
         [SerializeField] private float _regenDelay = 3f;
+        [Tooltip("Override du FrameSkipCount de base (50). 5 = regen vérifiée 5× moins souvent.")]
+        [SerializeField] private int _healthFrameSkip = 5;
+        protected override int FrameSkipCount => _healthFrameSkip;
         private float _lastDamageTime = -999f;
         /// <summary>Contrôle runtime de la regen (désactivée pendant la mort).</summary>
         private bool _regenEnabled = true;
@@ -44,9 +47,17 @@ namespace M2922.Component.Health
         protected override void Update()
         {
             base.Update();
-            if (_enableRegen && _regenEnabled && !IsDead && Time.time - _lastDamageTime > _regenDelay)
+
+            // ── EARLY-OUT : regen désactivée, mort, ou HP déjà plein ──
+            if (!_enableRegen || !_regenEnabled || IsDead || _currentHP >= _maxHP) return;
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
+            if (!ShouldUpdate()) return;
+
+            if (Time.time - _lastDamageTime > _regenDelay)
             {
-                _currentHP = Mathf.Min(_maxHP, _currentHP + _regenPerSecond * Time.deltaTime);
+                float regenAmount = _regenPerSecond * Time.deltaTime * FrameSkipCount;
+                _currentHP = Mathf.Min(_maxHP, _currentHP + regenAmount);
             }
         }
 

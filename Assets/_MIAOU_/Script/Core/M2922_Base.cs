@@ -30,6 +30,32 @@ namespace M2922.Core
         [Header("=== GIZMO ===")]
         [SerializeField] private bool _showGizmo = true;
 
+        [Header("=== FRAME SKIP (PERFORMANCE) ===")]
+        [Tooltip("Nombre de frames entre chaque Update() effectif. 1 = chaque frame, 50 = ~1×/sec @50fps.\n" +
+                 "Surchargeable par les scripts enfants (FrameSkipCount).")]
+        [SerializeField] protected int _updateEveryNFrames = 50;
+        private int _frameCounter = 0;
+
+        /// <summary>
+        /// Nombre de frames à sauter entre chaque exécution effective de Update().
+        /// Surchargez cette propriété dans les scripts critiques (regeneration, dégâts…).
+        /// </summary>
+        protected virtual int FrameSkipCount => _updateEveryNFrames;
+
+        /// <summary>
+        /// Appelez en début de Update() : retourne true tous les N frames.
+        /// Gère automatiquement le compteur et le reset.
+        /// </summary>
+        protected bool ShouldUpdate()
+        {
+            if (_frameCounter >= FrameSkipCount)
+            {
+                _frameCounter = 0;
+                return true;
+            }
+            return false;
+        }
+
         [Header("=== AUTO GIZMO ===")]
         [SerializeField] private bool _autoGizmo = true;
         [SerializeField] private float _gizmoOffsetY = 0.3f;
@@ -185,6 +211,8 @@ namespace M2922.Core
         }
         protected virtual void Update()
         {
+            _frameCounter++;
+
             if (Manager == null) TryFindManager();
             if (Manager != null && (DEBUG != Manager.DEBUG || VERBOSE_DEBUG != Manager.VERBOSE_DEBUG))
             {
@@ -194,7 +222,7 @@ namespace M2922.Core
         protected virtual void LateUpdate()
         {
         }
-        protected virtual void PostLateUpdate()
+        public override void PostLateUpdate()
         {
         }
         private void SetDebugFlags()
