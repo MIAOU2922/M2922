@@ -24,14 +24,8 @@ namespace M2922.Component.Health
         [SerializeField] private float _respawnDelay = 3f;
         [SerializeField] private Transform _respawnPoint;
 
-        [Header("=== PERFORMANCE ===")]
-        [Tooltip("Override du FrameSkipCount de base (50). 10 = death check ~6×/sec.")]
-        [SerializeField] private int _deathFrameSkip = 10;
-        protected override int FrameSkipCount => _deathFrameSkip;
-
         private bool _isDead = false;
         private float _deathTime = 0f;
-        private float _respawnedTime = -999f; // période de grâce anti-re-death
         private bool _healthRegenWasActive;   // mémorise l'état avant mort
         private bool _shieldRegenWasActive;
 
@@ -48,37 +42,33 @@ namespace M2922.Component.Health
             if (_shield == null) _shield = GetComponent<M2922_ShieldComponent>();
         }
 
-        protected override void Update()
+        /// <summary>
+        /// Appelé par M2922_HealthComponent au moment où les HP atteignent 0.
+        /// Mort et respawn sont désormais ÉVÉNEMENTIELS : aucun Update() permanent.
+        /// </summary>
+        public void NotifyHealthZero()
         {
-            base.Update();
-
-            // ── EARLY-OUT : rien à faire si pas mort et pas d'autoRespawn ──
-            if (!_isDead && !_autoRespawn) return;
-            // ── EARLY-OUT : mort sans autoRespawn → rien à vérifier ──
-            if (_isDead && !_autoRespawn) return;
-
-            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
-            if (!ShouldUpdate()) return;
+            // Parité avec l'ancien polling : sans _autoRespawn, le handler ne fait rien.
+            if (!_autoRespawn) return;
+            if (_isDead) return;
 
             // Seul le propriétaire de l'entité traite sa mort/respawn.
             if (!Networking.IsOwner(gameObject)) return;
 
-            // Période de grâce après respawn : évite que l'entité remeure
-            // immédiatement si _health.IsDead est encore true 1 frame après Revive().
-            if (_health != null && _health.IsDead && !_isDead
-                && Time.time - _respawnedTime > 0.5f)
-            {
-                Die();
-            }
+            Die();
+        }
 
-            if (_isDead && _autoRespawn && Time.time - _deathTime > _respawnDelay)
-            {
-                Respawn();
-            }
+        /// <summary>Événement différé programmé par Die() (plus de polling dans Update()).</summary>
+        public void _RespawnEvent()
+        {
+            if (!_isDead) return;
+            if (!Networking.IsOwner(gameObject)) return;
+            Respawn();
         }
 
         private void Die()
         {
+            if (_isDead) return;
             _isDead = true;
             _deathTime = Time.time;
 
@@ -108,12 +98,15 @@ namespace M2922.Component.Health
             }
 
             this.Log(_isPlayer ? "Player died." : "Entity died.");
+
+            // ── Respawn programmé (événement différé) : plus de polling dans Update() ──
+            if (_autoRespawn)
+                SendCustomEventDelayedSeconds("_RespawnEvent", _respawnDelay);
         }
 
         private void Respawn()
         {
             _isDead = false;
-            _respawnedTime = Time.time;
 
             // ── 4. REGEN VIE + SHIELD (restaurer si actif avant mort) ──
             if (_health != null) { _health.Revive(); if (_healthRegenWasActive) _health.SetRegenEnabled(true); }

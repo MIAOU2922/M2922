@@ -18,7 +18,7 @@ namespace M2922.Component.Weapon
     /// </summary>
     [AddComponentMenu("M2922/Weapon/Turret Controller")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class M2922_TurretController : M2922_Base
+    public class M2922_TurretController : M2922_Tickable
     {
         [Header("=== REFERENCES ===")]
         [SerializeField] private M2922_WeaponFireHandler _fireHandler;

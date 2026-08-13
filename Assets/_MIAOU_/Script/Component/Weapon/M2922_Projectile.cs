@@ -262,7 +262,7 @@ namespace M2922.Component.Weapon
         // LIFECYCLE
         // ===================================================
 
-        protected override void Update()
+        private void Update()
         {
             if (!_active) return;
 

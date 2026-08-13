@@ -11,7 +11,7 @@ namespace M2922.Component.Utils
     /// </summary>
     [AddComponentMenu("M2922/Utils/Look At Camera")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class M2922_LookAtCamera : M2922_Base
+    public class M2922_LookAtCamera : M2922_Tickable
     {
         [Header("=== AXES ===")]
         [Tooltip("Axe(s) à verrouiller (ex: Y seulement pour rester vertical).")]

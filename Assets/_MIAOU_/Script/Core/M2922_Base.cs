@@ -36,6 +36,10 @@ namespace M2922.Core
         [SerializeField] protected int _updateEveryNFrames = 50;
         private int _frameCounter = 0;
 
+        // Retry ÉVÉNEMENTIEL de la recherche du Manager (plus aucun polling par-frame)
+        private int _managerRetryCount = 0;
+        private const int MAX_MANAGER_RETRIES = 3;
+
         /// <summary>
         /// Nombre de frames à sauter entre chaque exécution effective de Update().
         /// Surchargez cette propriété dans les scripts critiques (regeneration, dégâts…).
@@ -43,8 +47,9 @@ namespace M2922.Core
         protected virtual int FrameSkipCount => _updateEveryNFrames;
 
         /// <summary>
-        /// Appelez en début de Update() : retourne true tous les N frames.
-        /// Gère automatiquement le compteur et le reset.
+        /// À appeler dans Update() d'un composant héritant de M2922_Tickable :
+        /// retourne true tous les N frames. Le compteur est incrémenté par
+        /// M2922_Tickable.Update() (via TickBase()).
         /// </summary>
         protected bool ShouldUpdate()
         {
@@ -205,25 +210,37 @@ namespace M2922.Core
             _ScriptName = this.GetType().Name;
             else if (string.IsNullOrEmpty(_ScriptName))
             _ScriptName = this.GetType().Name;
-            if (Manager == null) TryFindManager();
-            SetDebugFlags();
+            _OnManagerFlagsChanged();
             AutoDetectReferences();
         }
-        protected virtual void Update()
+        /// <summary>
+        /// Travail par-frame de la base : compteur de frames UNIQUEMENT.
+        /// Appelé par M2922_Tickable.Update() — M2922_Base n'a plus d'Update,
+        /// donc un composant événementiel qui hérite de M2922_Base n'a AUCUN coût par frame.
+        /// La resync Manager/debug est désormais ÉVÉNEMENTIELLE (_OnManagerFlagsChanged).
+        /// </summary>
+        protected void TickBase()
         {
             _frameCounter++;
-
+        }
+        /// <summary>
+        /// Resync Manager + flags debug. ÉVÉNEMENTIEL : appelé au Start() et planifié en
+        /// retry différé tant que le Manager est introuvable (ordre de chargement de scène).
+        /// Plus aucun polling par-frame.
+        /// </summary>
+        public void _OnManagerFlagsChanged()
+        {
             if (Manager == null) TryFindManager();
-            if (Manager != null && (DEBUG != Manager.DEBUG || VERBOSE_DEBUG != Manager.VERBOSE_DEBUG))
+
+            // Retry différé si le Manager n'est toujours pas dispo
+            if (Manager == null && _managerRetryCount < MAX_MANAGER_RETRIES)
             {
-                SetDebugFlags();
+                _managerRetryCount++;
+                SendCustomEventDelayedFrames("_OnManagerFlagsChanged", 30 * _managerRetryCount);
+                return;
             }
-        }
-        protected virtual void LateUpdate()
-        {
-        }
-        public override void PostLateUpdate()
-        {
+
+            SetDebugFlags();
         }
         private void SetDebugFlags()
         {

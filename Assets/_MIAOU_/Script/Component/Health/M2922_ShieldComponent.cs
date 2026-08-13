@@ -10,7 +10,7 @@ namespace M2922.Component.Health
     /// </summary>
     [AddComponentMenu("M2922/Health/Shield Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class M2922_ShieldComponent : M2922_Base
+    public class M2922_ShieldComponent : M2922_Tickable
     {
         [Header("=== SHIELD ===")]
         [SerializeField] private float _maxShield = 50f;
@@ -42,10 +42,10 @@ namespace M2922.Component.Health
 
         protected override void Update()
         {
-            base.Update();
-
-            // ── EARLY-OUT : regen désactivée ou shield déjà plein ──
+            // ── EARLY-OUT AVANT base.Update() : zéro travail si rien à régénérer ──
             if (!_regenEnabled || _currentShield >= _maxShield) return;
+
+            base.Update();
 
             // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
             if (!ShouldUpdate()) return;

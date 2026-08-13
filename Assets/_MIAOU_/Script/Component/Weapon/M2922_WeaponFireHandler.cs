@@ -367,7 +367,7 @@ namespace M2922.Component.Weapon
         // UPDATE
         // ===================================================
 
-        protected override void Update()
+        private void Update()
         {
             if (_weapon == null) return;
 

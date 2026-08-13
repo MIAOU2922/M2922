@@ -20,7 +20,7 @@ namespace M2922.Component.UI
     /// </summary>
     [AddComponentMenu("M2922/UI/Counter UI")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class M2922_CounterUI : M2922_Base
+    public class M2922_CounterUI : M2922_Tickable
     {
         [Header("=== REFERENCES ===")]
         [Tooltip("Texte TMP pour afficher le compteur (auto-détecté si vide).")]
@@ -96,6 +96,11 @@ namespace M2922.Component.UI
         /// </summary>
         protected override void Update()
         {
+            base.Update();
+
+            // ── FRAME-SKIP (M2922_Base.ShouldUpdate) : polling ~1×/sec ──
+            if (!ShouldUpdate()) return;
+
             if (_counterStore == null) return;
 
             string key = GetSaveKey();

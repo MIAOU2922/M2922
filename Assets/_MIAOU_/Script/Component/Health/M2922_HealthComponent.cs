@@ -10,7 +10,7 @@ namespace M2922.Component.Health
     /// </summary>
     [AddComponentMenu("M2922/Health/Health Component")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class M2922_HealthComponent : M2922_Base
+    public class M2922_HealthComponent : M2922_Tickable
     {
         [Header("=== HEALTH ===")]
         [SerializeField] private float _maxHP = 100f;
@@ -28,6 +28,10 @@ namespace M2922.Component.Health
         /// <summary>Contrôle runtime de la regen (désactivée pendant la mort).</summary>
         private bool _regenEnabled = true;
 
+        [Header("=== DEATH ===")]
+        [Tooltip("DeathHandler à notifier quand les HP atteignent 0 (auto-détecté si vide).")]
+        [SerializeField] private M2922_DeathHandler _deathHandler;
+
         [Header("=== NETWORK AUTHORITY ===")]
         [SerializeField] private M2922_HitboxSystem _hitboxSystem;
 
@@ -41,15 +45,16 @@ namespace M2922.Component.Health
         {
             base.Start();
             if (_hitboxSystem == null) _hitboxSystem = GetComponent<M2922_HitboxSystem>();
+            if (_deathHandler == null) _deathHandler = GetComponent<M2922_DeathHandler>();
             _currentHP = _maxHP;
         }
 
         protected override void Update()
         {
-            base.Update();
-
-            // ── EARLY-OUT : regen désactivée, mort, ou HP déjà plein ──
+            // ── EARLY-OUT AVANT base.Update() : zéro travail si rien à régénérer ──
             if (!_enableRegen || !_regenEnabled || IsDead || _currentHP >= _maxHP) return;
+
+            base.Update();
 
             // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
             if (!ShouldUpdate()) return;
@@ -79,6 +84,7 @@ namespace M2922.Component.Health
 
         public void TakeDamage(float amount)
         {
+            bool wasAlive = _currentHP > 0f;
             _currentHP = Mathf.Max(0f, _currentHP - amount);
             _lastDamageTime = Time.time;
             bool sync = ShouldSync();
@@ -89,6 +95,10 @@ namespace M2922.Component.Health
             }
             else if (DEBUG)
                 this.Log($"[Health] TakeDamage({amount:F1}) → HP={_currentHP:F1}, PAS de serialization (pas autorité)");
+
+            // ── MORT ÉVÉNEMENTIELLE : notifie le DeathHandler au moment où HP atteint 0 ──
+            if (wasAlive && _currentHP <= 0f && _deathHandler != null)
+                _deathHandler.NotifyHealthZero();
         }
 
         public void Heal(float amount)

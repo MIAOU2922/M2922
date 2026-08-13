@@ -20,7 +20,7 @@ namespace M2922.Component.Health
 
     [UdonBehaviourSyncMode(BehaviourSyncMode.NoVariableSync)]
     [AddComponentMenu("M2922/Debug/Hitbox Debug Visualizer")]
-    public class M2922_HitboxDebugVisualizer : M2922_Base
+    public class M2922_HitboxDebugVisualizer : M2922_Tickable
     {
         [Header("=== REFERENCES ===")]
         [SerializeField] private M2922_HitboxSystem _hitboxSystem;
@@ -111,8 +111,20 @@ namespace M2922.Component.Health
         private void OnDisable() { ClearAll(); }
 
         /// <summary>
+        /// Override Update pour ne PAS payer le tick (compteur + Manager) quand le
+        /// visualiseur est désactivé en runtime ou en mode HideAll.
+        /// </summary>
+        protected override void Update()
+        {
+            if (_runtimeDisabled || _visibilityMode == HitboxDebugVisibility.HideAll)
+                return;
+
+            base.Update();
+        }
+
+        /// <summary>
         /// PERFORMANCE: LateUpdate tourne à fréquence réduite (_updateEveryNFrames).\n        /// En production, mettre _runtimeDisabled=true ou _visibilityMode=HideAll.\n        /// </summary>
-        protected override void LateUpdate()
+        private void LateUpdate()
         {
             // ── Désactivation complète runtime (production) ──
             if (_runtimeDisabled) return;

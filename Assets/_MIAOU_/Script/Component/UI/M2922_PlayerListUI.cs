@@ -18,7 +18,7 @@ namespace M2922.Component.UI
     /// </summary>
     [AddComponentMenu("M2922/UI/Player List UI")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class M2922_PlayerListUI : M2922_Base
+    public class M2922_PlayerListUI : M2922_Tickable
     {
         [Header("=== REFERENCES ===")]
         [Tooltip("Manager de visibilité pour la liste allowed.")]

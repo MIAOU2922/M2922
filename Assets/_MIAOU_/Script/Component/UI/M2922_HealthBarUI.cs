@@ -31,7 +31,7 @@ namespace M2922.Component.UI
     /// </summary>
     [AddComponentMenu("M2922/UI/Health Bar UI")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class M2922_HealthBarUI : M2922_Base
+    public class M2922_HealthBarUI : M2922_Tickable
     {
         [Header("=== REFERENCES CIBLE ===")]
         [Tooltip("DamageReceiver de l'entité à observer. Laissez vide = auto-détection locale.")]

@@ -11,7 +11,7 @@ namespace M2922.Component.Modifier
     /// </summary>
     [AddComponentMenu("M2922/Modifier/Modifier Container")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
-    public class M2922_ModifierContainer : M2922_Base
+    public class M2922_ModifierContainer : M2922_Tickable
     {
         [Header("=== MODIFIERS ===")]
         [SerializeField] private int _maxModifiers = 16;
@@ -47,10 +47,10 @@ namespace M2922.Component.Modifier
 
         protected override void Update()
         {
-            base.Update();
-
-            // ── EARLY-OUT : aucun modifier actif → rien à nettoyer ──
+            // ── EARLY-OUT AVANT base.Update() : zéro travail sans modifier actif ──
             if (_activeCount == 0) return;
+
+            base.Update();
 
             // ── FRAME-SKIP (M2922_Base.ShouldUpdate) ──
             if (!ShouldUpdate()) return;
