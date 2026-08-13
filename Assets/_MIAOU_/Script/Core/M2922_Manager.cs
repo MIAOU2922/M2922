@@ -44,11 +44,6 @@ namespace M2922.Core
             this.Log($"Host Player Name: {_hostPlayerName}");
             this.Log($"Player Count: {PlayerCount}");
         }
-        protected override void Update()
-        {
-            base.Update();
-            // todo
-        }
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
             this.Log($"Player joined: {player.displayName}");
