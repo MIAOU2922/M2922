@@ -241,7 +241,21 @@ namespace M2922.Core
             }
 
             SetDebugFlags();
+
+            // Notifie les composants dépendants du Manager (ex : enregistrement
+            // des items d'inventaire) — appelé au Start OU au retry réussi.
+            OnManagerReady();
         }
+
+        /// <summary>
+        /// Appelé dès que le Manager est disponible (au Start, ou via le retry
+        /// différé si l'ordre de chargement de la scène l'avait retardé).
+        /// Surchargez-le pour exécuter la logique dépendant du Manager.
+        /// </summary>
+        protected virtual void OnManagerReady()
+        {
+        }
+
         private void SetDebugFlags()
         {
             if (Manager == null || Manager == this.gameObject) return;
