@@ -27,11 +27,15 @@ namespace M2922.Core
         [SerializeField] private int _registryCount = 0;
 
         [Header("=== NPC REGISTRY ===")]
-        private M2922.Component.Health.M2922_DamageReceiver[] _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[200];
+        [Tooltip("Taille du registre NPC. Renseignée automatiquement au build selon le nombre de NPCs présents dans la scène.")]
+        [SerializeField] private int _npcMax = 200;
+        private M2922.Component.Health.M2922_DamageReceiver[] _npcReceivers;
         [SerializeField] private int _npcCount = 0;
 
         [Header("=== INVENTORY ITEM REGISTRY ===")]
-        private M2922.Component.Inventory.M2922_InventoryItem[] _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[500];
+        [Tooltip("Taille du registre d'items. Renseignée automatiquement au build selon le nombre d'items présents dans la scène.")]
+        [SerializeField] private int _inventoryItemMax = 500;
+        private M2922.Component.Inventory.M2922_InventoryItem[] _inventoryItems;
         [SerializeField] private int _inventoryItemCount = 0;
 
         // === METHODE ===
@@ -39,6 +43,12 @@ namespace M2922.Core
         {
             base.Start();
             _activePlayers = new VRCPlayerApi[_maxPlayers];
+
+            // Tailles de registres ajustées au build (avec minimum de sécurité).
+            if (_npcMax < 8) _npcMax = 8;
+            if (_inventoryItemMax < 8) _inventoryItemMax = 8;
+            _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[_npcMax];
+            _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[_inventoryItemMax];
 
             // Vérifier si on est le host
             _isHost = Networking.LocalPlayer != null && Networking.LocalPlayer.isMaster;
@@ -127,7 +137,9 @@ namespace M2922.Core
         /// <summary>Enregistre un NPC/destructible et retourne son entityId.</summary>
         public int RegisterNpc(M2922.Component.Health.M2922_DamageReceiver receiver)
         {
-            if (_npcCount >= 200) return -1;
+            if (_npcReceivers == null)
+                _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[_npcMax];
+            if (_npcCount >= _npcMax) return -1;
             int id = _npcCount;
             _npcReceivers[_npcCount] = receiver;
             _npcCount++;
@@ -136,7 +148,7 @@ namespace M2922.Core
 
         public M2922.Component.Health.M2922_DamageReceiver GetNpcReceiverByEntityId(int entityId)
         {
-            if (entityId < 0 || entityId >= _npcCount) return null;
+            if (_npcReceivers == null || entityId < 0 || entityId >= _npcCount) return null;
             return _npcReceivers[entityId];
         }
 
@@ -151,6 +163,9 @@ namespace M2922.Core
         public void RegisterInventoryItem(M2922.Component.Inventory.M2922_InventoryItem item)
         {
             if (item == null) return;
+
+            if (_inventoryItems == null)
+                _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[_inventoryItemMax];
 
             // Anti-doublon (OnManagerReady peut être rappelé, ou self-heal du coffre).
             for (int i = 0; i < _inventoryItemCount; i++)
@@ -174,7 +189,7 @@ namespace M2922.Core
                 return;
             }
 
-            if (_inventoryItemCount >= 500) return;
+            if (_inventoryItemCount >= _inventoryItemMax) return;
 
             _inventoryItems[_inventoryItemCount] = item;
             _inventoryItemCount++;
@@ -182,10 +197,23 @@ namespace M2922.Core
             this.VerboseLog($"[Manager] Item d'inventaire enregistré : {item.ItemName} (clé {item.Key}, total {_inventoryItemCount})");
         }
 
+        /// <summary>Nombre d'items d'inventaire enregistrés.</summary>
+        public int GetInventoryItemCount()
+        {
+            return _inventoryItemCount;
+        }
+
+        /// <summary>Retourne l'item d'inventaire à l'index donné (null si hors bornes).</summary>
+        public M2922.Component.Inventory.M2922_InventoryItem GetInventoryItemAt(int index)
+        {
+            if (_inventoryItems == null || index < 0 || index >= _inventoryItemCount) return null;
+            return _inventoryItems[index];
+        }
+
         /// <summary>Retrouve un item d'inventaire par sa clé (Key), null si introuvable.</summary>
         public M2922.Component.Inventory.M2922_InventoryItem GetInventoryItemByKey(string key)
         {
-            if (string.IsNullOrEmpty(key)) return null;
+            if (string.IsNullOrEmpty(key) || _inventoryItems == null) return null;
 
             for (int i = 0; i < _inventoryItemCount; i++)
             {

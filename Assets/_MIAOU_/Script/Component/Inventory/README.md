@@ -58,10 +58,22 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
   automatiquement par la zone d'insertion — **aucun réglage sur l'item**.
 
 **Item synchronisé** (`M2922_InventoryItemSynced`) :
-- Mode de sync **Continuous** (pas Manual) : compatible avec un `VRCObjectSync`
-  sur le même GameObject. Le SDK refuse `VRCObjectSync` + Udon **Manual** au build.
-- Peut rester sur la racine avec le `VRCPickup` + `VRCObjectSync` (comme sur les armes M2922).
-- Même setup que l'item local + Proxy sur le collider.
+- Hiérarchie RECOMMANDÉE (encapsulation d'un pickup existant) :
+  ```
+  Root   → M2922_InventoryItemSynced (ce script, TOUJOURS actif)
+    └─ Pickup → VRCPickup + VRCObjectSync + M2922_InventoryProxy (+ scripts du prop)
+        └─ Contenu (mesh, colliders, renderers, particles, …)
+  ```
+- Le script vit sur la **racine** (qui reste active) et désactive/réactive le
+  sous-arbre du `VRCPickup` : la sync `Active` continue de fonctionner
+  (un UdonBehaviour désactivé ne reçoit plus `OnDeserialization`).
+- Mode de sync **Continuous** : compatible avec un `VRCObjectSync` (ici sur un
+  enfant). Le SDK refuse `VRCObjectSync` + Udon **Manual** sur le même objet.
+- Le `Pickup` est auto-détecté (y compris dans les enfants) ; le Proxy est placé
+  sur le même GameObject que le `VRCPickup`.
+- Si le script est posé **à plat** sur le GameObject du pickup (ancien setup),
+  un fallback cache uniquement renderers/colliders/particles — l'encapsulation
+  reste recommandée pour désactiver aussi les scripts/animators du contenu.
 
 **Enregistrement automatique** : chaque `M2922_InventoryItem` s'enregistre
 LUI-MÊME auprès du `M2922_Manager` au Start (retry si le Manager n'est pas encore

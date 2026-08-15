@@ -41,6 +41,7 @@ namespace M2922.Component.Inventory
     {
         public const string ID_BUTTON = "Button";
         public const string ID_ITEM = "Item";
+        public const string ID_STACK = "Stack";
 
         [Header("=== COMPORTEMENT ===")]
         [Tooltip("Méthode de tri de la liste (Latest = plus récent d'abord, AZ = alphabétique).")]
@@ -225,27 +226,48 @@ namespace M2922.Component.Inventory
 
             Networking.SetOwner(_localPlayer, item.gameObject);
 
-            GameObject buttonObj = Instantiate(ButtonPrefab, ButtonParent);
-            buttonObj.name = $"{item.name} Button";
+            int stackIndex = _FindStackIndexFor(item);
+            if (stackIndex >= 0)
+            {
+                DataDictionary stackEntry = ItemList[stackIndex].DataDictionary;
+                DataList stack = stackEntry[ID_STACK].DataList;
+                stack.Add(item);
 
-            DataDictionary itemDictionary = new DataDictionary();
-            itemDictionary[ID_BUTTON] = buttonObj;
-            itemDictionary[ID_ITEM] = item;
-            ItemList.Add(itemDictionary);
+                M2922_InventoryItem rep = (M2922_InventoryItem)stackEntry[ID_ITEM].Reference;
+                if (rep != null) rep.StoredTimestamp = Time.realtimeSinceStartup;
 
-            M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
-            if (button != null)
-                button._Init(this, itemDictionary);
+                _RefreshButtonCount(stackEntry);
+                _SelectItem(stackEntry);
+            }
+            else
+            {
+                DataList stack = new DataList();
+                stack.Add(item);
+
+                GameObject buttonObj = Instantiate(ButtonPrefab, ButtonParent);
+                buttonObj.name = $"{item.name} Button";
+
+                DataDictionary itemDictionary = new DataDictionary();
+                itemDictionary[ID_BUTTON] = buttonObj;
+                itemDictionary[ID_ITEM] = item;
+                itemDictionary[ID_STACK] = stack;
+                ItemList.Add(itemDictionary);
+
+                M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
+                if (button != null)
+                    button._Init(this, itemDictionary);
+
+                _SelectItem(itemDictionary);
+            }
 
             item._Hide();
-            _SelectItem(itemDictionary);
             _SortList();
             _RefreshWeightText();
 
             if (Inserter != null)
                 Inserter._Highlight(false);
 
-            this.VerboseLog($"[Inventory] Item rangé : {item.ItemName} (total : {ItemList.Count})");
+            this.VerboseLog($"[Inventory] Item rangé : {item.ItemName} (total : {_ItemCount()})");
         }
 
         /// <summary>Affiche les détails d'un item dans le panneau (icône, nom, description).</summary>
@@ -268,13 +290,17 @@ namespace M2922.Component.Inventory
         /// Virtual : l'inventaire MONDE le surcharge (relay réseau partagé).</summary>
         public virtual void _SpawnItem()
         {
-            if (ItemList.Count == 0) return;
             if (_selectedItem == null) return;
             int index = ItemList.IndexOf(_selectedItem);
             if (index == -1) return;
 
-            M2922_InventoryItem item = (M2922_InventoryItem)_selectedItem[ID_ITEM].Reference;
-            _RemoveItem(item);
+            DataDictionary entry = ItemList[index].DataDictionary;
+            DataList stack = entry[ID_STACK].DataList;
+            if (stack == null || stack.Count == 0) return;
+
+            // LIFO : sort le dernier item rangé du stack.
+            M2922_InventoryItem item = (M2922_InventoryItem)stack[stack.Count - 1].Reference;
+            _RemoveItemFromStack(index, item);
 
             Transform spawn = SpawnPoint != null ? SpawnPoint : transform;
             item._Spawn(spawn);
@@ -283,34 +309,20 @@ namespace M2922.Component.Inventory
         /// <summary>Retire un item de la liste et met à jour le panneau (sélection voisine).</summary>
         public void _RemoveItem(M2922_InventoryItem item)
         {
-            int index = -1;
+            if (item == null) return;
+
             for (int i = 0; i < ItemList.Count; i++)
             {
-                M2922_InventoryItem listItem = (M2922_InventoryItem)ItemList[i].DataDictionary[ID_ITEM].Reference;
-                if (listItem == item)
+                DataDictionary entry = ItemList[i].DataDictionary;
+                DataList stack = entry[ID_STACK].DataList;
+                if (stack == null) continue;
+
+                if (_IndexOfInStack(stack, item) >= 0)
                 {
-                    index = i;
-                    break;
+                    _RemoveItemFromStack(i, item);
+                    return;
                 }
             }
-            if (index == -1) return;
-
-            GameObject button = (GameObject)ItemList[index].DataDictionary[ID_BUTTON].Reference;
-            Destroy(button);
-
-            ItemList.RemoveAt(index);
-
-            if (ItemList.Count == 0)
-            {
-                ClearMenu();
-            }
-            else
-            {
-                int clampedIndex = Mathf.Clamp(index, 0, ItemList.Count - 1);
-                _SelectItem(ItemList[clampedIndex].DataDictionary);
-            }
-
-            _RefreshWeightText();
         }
 
         /// <summary>Filtre les boutons selon le texte du champ de recherche.</summary>
@@ -388,30 +400,171 @@ namespace M2922.Component.Inventory
         /// <summary>True si l'inventaire contient au moins un item de ce nom.</summary>
         public bool _HasItem(string itemName)
         {
-            for (int i = 0; i < ItemList.Count; i++)
-            {
-                M2922_InventoryItem item = (M2922_InventoryItem)ItemList[i].DataDictionary[ID_ITEM].Reference;
-                if (item.ItemName == itemName) return true;
-            }
-            return false;
+            return _CountItemByName(itemName) > 0;
         }
 
-        /// <summary>Nombre d'items actuellement rangés.</summary>
+        /// <summary>Nombre total d'items actuellement rangés (tous stacks confondus).</summary>
         public int _ItemCount()
         {
-            return ItemList.Count;
+            int total = 0;
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                DataList stack = ItemList[i].DataDictionary[ID_STACK].DataList;
+                if (stack != null) total += stack.Count;
+            }
+            return total;
         }
 
-        /// <summary>Poids total des items actuellement rangés.</summary>
+        /// <summary>Poids total des items actuellement rangés (count × poids).</summary>
         public int _GetTotalWeight()
         {
             int total = 0;
             for (int i = 0; i < ItemList.Count; i++)
             {
-                M2922_InventoryItem item = (M2922_InventoryItem)ItemList[i].DataDictionary[ID_ITEM].Reference;
-                total += item.Weight;
+                DataDictionary entry = ItemList[i].DataDictionary;
+                M2922_InventoryItem item = (M2922_InventoryItem)entry[ID_ITEM].Reference;
+                DataList stack = entry[ID_STACK].DataList;
+                int count = stack != null ? stack.Count : 1;
+                if (item != null) total += item.Weight * count;
             }
             return total;
+        }
+
+        /// <summary>Nombre total d'items de ce nom, tous stacks confondus.</summary>
+        public int _CountItemByName(string itemName)
+        {
+            if (string.IsNullOrEmpty(itemName)) return 0;
+            int total = 0;
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                DataDictionary entry = ItemList[i].DataDictionary;
+                M2922_InventoryItem item = (M2922_InventoryItem)entry[ID_ITEM].Reference;
+                if (item == null || item.ItemName != itemName) continue;
+                DataList stack = entry[ID_STACK].DataList;
+                if (stack != null) total += stack.Count;
+            }
+            return total;
+        }
+
+        /// <summary>Consomme un item de ce nom (retire un exemplaire du premier stack trouvé).</summary>
+        public bool _ConsumeItemByName(string itemName)
+        {
+            if (string.IsNullOrEmpty(itemName)) return false;
+
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                DataDictionary entry = ItemList[i].DataDictionary;
+                M2922_InventoryItem item = (M2922_InventoryItem)entry[ID_ITEM].Reference;
+                if (item == null || item.ItemName != itemName) continue;
+
+                DataList stack = entry[ID_STACK].DataList;
+                if (stack == null || stack.Count == 0) continue;
+
+                M2922_InventoryItem toRemove = (M2922_InventoryItem)stack[stack.Count - 1].Reference;
+                _RemoveItemFromStack(i, toRemove);
+                return true;
+            }
+            return false;
+        }
+
+        // ============================================================
+        // STACK HELPERS (utilisés aussi par M2922_WorldInventory)
+        // ============================================================
+
+        /// <summary>Index du stack qui peut accueillir item (-1 si aucun).</summary>
+        protected int _FindStackIndexFor(M2922_InventoryItem item)
+        {
+            if (item == null) return -1;
+
+            for (int i = 0; i < ItemList.Count; i++)
+            {
+                DataDictionary entry = ItemList[i].DataDictionary;
+                M2922_InventoryItem rep = (M2922_InventoryItem)entry[ID_ITEM].Reference;
+                if (rep == null) continue;
+                if (!item._CanStackWith(rep)) continue;
+
+                DataList stack = entry[ID_STACK].DataList;
+                if (stack == null) continue;
+                if (item._IsStackFull(stack.Count)) continue;
+
+                return i;
+            }
+            return -1;
+        }
+
+        /// <summary>Index de item dans le stack (-1 si absent).</summary>
+        protected int _IndexOfInStack(DataList stack, M2922_InventoryItem item)
+        {
+            if (stack == null || item == null) return -1;
+            for (int i = 0; i < stack.Count; i++)
+            {
+                M2922_InventoryItem it = (M2922_InventoryItem)stack[i].Reference;
+                if (it == item) return i;
+            }
+            return -1;
+        }
+
+        /// <summary>Nombre d'items d'un stack (0 si entrée invalide).</summary>
+        protected int _GetStackCount(DataDictionary entry)
+        {
+            if (entry == null) return 0;
+            DataList stack = entry[ID_STACK].DataList;
+            return stack != null ? stack.Count : 0;
+        }
+
+        /// <summary>Met à jour le compteur affiché sur le bouton du stack.</summary>
+        protected void _RefreshButtonCount(DataDictionary entry)
+        {
+            if (entry == null) return;
+            GameObject buttonObj = (GameObject)entry[ID_BUTTON].Reference;
+            if (buttonObj == null) return;
+            M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
+            if (button != null) button._RefreshCount(_GetStackCount(entry));
+        }
+
+        /// <summary>Retire un item de son stack ; détruit le stack s'il devient vide.</summary>
+        protected void _RemoveItemFromStack(int stackIndex, M2922_InventoryItem item)
+        {
+            if (stackIndex < 0 || stackIndex >= ItemList.Count) return;
+
+            bool wasSelected = _selectedItem != null && ItemList.IndexOf(_selectedItem) == stackIndex;
+
+            DataDictionary entry = ItemList[stackIndex].DataDictionary;
+            DataList stack = entry[ID_STACK].DataList;
+            if (stack == null) return;
+
+            int idx = _IndexOfInStack(stack, item);
+            if (idx == -1) return;
+            stack.RemoveAt(idx);
+
+            M2922_InventoryItem rep = (M2922_InventoryItem)entry[ID_ITEM].Reference;
+            if (rep == item && stack.Count > 0)
+                entry[ID_ITEM] = (M2922_InventoryItem)stack[0].Reference;
+
+            if (stack.Count == 0)
+            {
+                GameObject button = (GameObject)entry[ID_BUTTON].Reference;
+                if (button != null) Destroy(button);
+
+                ItemList.RemoveAt(stackIndex);
+
+                if (ItemList.Count == 0)
+                {
+                    ClearMenu();
+                }
+                else
+                {
+                    int clamped = Mathf.Clamp(stackIndex, 0, ItemList.Count - 1);
+                    _SelectItem(ItemList[clamped].DataDictionary);
+                }
+            }
+            else
+            {
+                _RefreshButtonCount(entry);
+                if (wasSelected) _SelectItem(entry);
+            }
+
+            _RefreshWeightText();
         }
 
         /// <summary>True si l'item peut être rangé (limite de poids). MaxWeight = -1 → illimité.</summary>
@@ -451,7 +604,7 @@ namespace M2922.Component.Inventory
         {
             return new M2922_GizmoDisplayInfo[]
             {
-                new M2922_GizmoDisplayInfo("Items", ItemList.Count.ToString()),
+                new M2922_GizmoDisplayInfo("Items", _ItemCount().ToString()),
                 new M2922_GizmoDisplayInfo("Poids", MaxWeight < 0 ? $"{_GetTotalWeight()} / ∞" : $"{_GetTotalWeight()} / {MaxWeight}"),
                 new M2922_GizmoDisplayInfo("Tri", Sorting.ToString()),
             };

@@ -25,6 +25,8 @@ namespace M2922.Component.Inventory
         public Image ItemIcon;
         [Tooltip("Texte du nom de l'item.")]
         public TextMeshProUGUI ItemName;
+        [Tooltip("OPTIONNEL : TMP affichant le nombre d'items dans le stack (masqué si 1).")]
+        public TextMeshProUGUI ItemCount;
 
         [Header("=== RUNTIME (lecture seule) ===")]
         public M2922_Inventory Inventory;
@@ -40,6 +42,26 @@ namespace M2922.Component.Inventory
 
             if (ItemName != null) ItemName.text = item.ItemName;
             if (ItemIcon != null) ItemIcon.sprite = item.Icon;
+
+            DataList stack = dataItem[M2922_Inventory.ID_STACK].DataList;
+            _RefreshCount(stack != null ? stack.Count : 1);
+        }
+
+        /// <summary>Met à jour l'affichage du compteur du stack.</summary>
+        public void _RefreshCount(int count)
+        {
+            if (ItemCount == null) return;
+
+            if (count <= 1)
+            {
+                ItemCount.text = string.Empty;
+                ItemCount.gameObject.SetActive(false);
+            }
+            else
+            {
+                ItemCount.text = $"x{count}";
+                ItemCount.gameObject.SetActive(true);
+            }
         }
 
         /// <summary>À lier au onClick du Button.</summary>

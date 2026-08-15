@@ -101,10 +101,13 @@ namespace M2922.Component.Inventory
 
         public override void _SpawnItem()
         {
-            if (ItemList.Count == 0) return;
             if (_selectedItem == null) return;
 
-            M2922_InventoryItem item = (M2922_InventoryItem)_selectedItem[ID_ITEM].Reference;
+            DataList stack = _selectedItem[ID_STACK].DataList;
+            if (stack == null || stack.Count == 0) return;
+
+            // LIFO : retire un exemplaire du stack sélectionné.
+            M2922_InventoryItem item = (M2922_InventoryItem)stack[stack.Count - 1].Reference;
             _RequestAction("REMOVE:" + item.Key);
         }
 
@@ -370,7 +373,10 @@ namespace M2922.Component.Inventory
             // Conserver la clé sélectionnée si possible.
             string selectedKey = "";
             if (_selectedItem != null)
-                selectedKey = ((M2922_InventoryItem)_selectedItem[ID_ITEM].Reference).Key;
+            {
+                M2922_InventoryItem sel = (M2922_InventoryItem)_selectedItem[ID_ITEM].Reference;
+                if (sel != null) selectedKey = sel.Key;
+            }
 
             // Nettoyer la liste locale (boutons + données).
             for (int i = 0; i < ItemList.Count; i++)
@@ -389,16 +395,7 @@ namespace M2922.Component.Inventory
                 M2922_InventoryItem item = _FindItemByKey(keys[i]);
                 if (item == null) continue;
 
-                GameObject buttonObj = Instantiate(ButtonPrefab, ButtonParent);
-                buttonObj.name = $"{item.name} Button";
-
-                DataDictionary itemDictionary = new DataDictionary();
-                itemDictionary[ID_BUTTON] = buttonObj;
-                itemDictionary[ID_ITEM] = item;
-                ItemList.Add(itemDictionary);
-
-                M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
-                if (button != null) button._Init(this, itemDictionary);
+                _AddItemToStackView(item);
             }
 
             _SortList();
@@ -408,17 +405,56 @@ namespace M2922.Component.Inventory
             _RefreshWeightText();
         }
 
+        /// <summary>Ajoute un item à la vue locale en le stackant (respecte MaxStackSize).</summary>
+        private void _AddItemToStackView(M2922_InventoryItem item)
+        {
+            int stackIndex = _FindStackIndexFor(item);
+            if (stackIndex >= 0)
+            {
+                DataDictionary entry = ItemList[stackIndex].DataDictionary;
+                DataList stack = entry[ID_STACK].DataList;
+                stack.Add(item);
+                _RefreshButtonCount(entry);
+                return;
+            }
+
+            DataList stack = new DataList();
+            stack.Add(item);
+
+            GameObject buttonObj = Instantiate(ButtonPrefab, ButtonParent);
+            buttonObj.name = $"{item.name} Button";
+
+            DataDictionary itemDictionary = new DataDictionary();
+            itemDictionary[ID_BUTTON] = buttonObj;
+            itemDictionary[ID_ITEM] = item;
+            itemDictionary[ID_STACK] = stack;
+            ItemList.Add(itemDictionary);
+
+            M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
+            if (button != null) button._Init(this, itemDictionary);
+        }
+
         private void _SelectStoredKey(string key)
         {
             if (ItemList.Count == 0) return;
 
-            for (int i = 0; i < ItemList.Count; i++)
+            if (!string.IsNullOrEmpty(key))
             {
-                M2922_InventoryItem item = (M2922_InventoryItem)ItemList[i].DataDictionary[ID_ITEM].Reference;
-                if (item.Key == key)
+                for (int i = 0; i < ItemList.Count; i++)
                 {
-                    _SelectItem(ItemList[i].DataDictionary);
-                    return;
+                    DataDictionary entry = ItemList[i].DataDictionary;
+                    DataList stack = entry[ID_STACK].DataList;
+                    if (stack == null) continue;
+
+                    for (int j = 0; j < stack.Count; j++)
+                    {
+                        M2922_InventoryItem item = (M2922_InventoryItem)stack[j].Reference;
+                        if (item != null && item.Key == key)
+                        {
+                            _SelectItem(entry);
+                            return;
+                        }
+                    }
                 }
             }
 

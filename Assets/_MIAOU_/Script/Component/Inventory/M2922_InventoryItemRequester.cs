@@ -36,34 +36,27 @@ namespace M2922.Component.Inventory
                 return;
             }
 
-            DataList foundItemList = new DataList();
-            DataList cachedItemList = Inventory.ItemList.DeepClone();
-
+            // 1. Vérifier les quantités (tout ou rien) AVANT de consommer.
             for (int x = 0; x < ItemsToRemove.Length; x++)
             {
                 string itemName = ItemsToRemove[x];
-                for (int y = 0; y < cachedItemList.Count; y++)
+                if (string.IsNullOrEmpty(itemName)) continue;
+
+                int required = 0;
+                for (int y = 0; y < ItemsToRemove.Length; y++)
+                    if (ItemsToRemove[y] == itemName) required++;
+
+                if (Inventory._CountItemByName(itemName) < required)
                 {
-                    M2922_InventoryItem item = (M2922_InventoryItem)cachedItemList[y].DataDictionary[M2922_Inventory.ID_ITEM].Reference;
-                    if (item.ItemName == itemName)
-                    {
-                        foundItemList.Add(cachedItemList[y].DataDictionary);
-                        cachedItemList.Remove(cachedItemList[y].DataDictionary);
-                        break;
-                    }
+                    this.Warning($"[Requester] Items manquants ({itemName}) : {Inventory._CountItemByName(itemName)}/{required}.");
+                    return;
                 }
             }
 
-            if (foundItemList.Count != ItemsToRemove.Length)
+            // 2. Consommer un exemplaire par item demandé.
+            for (int x = 0; x < ItemsToRemove.Length; x++)
             {
-                this.Warning($"[Requester] Items manquants : {foundItemList.Count}/{ItemsToRemove.Length}.");
-                return;
-            }
-
-            for (int i = 0; i < foundItemList.Count; i++)
-            {
-                M2922_InventoryItem item = (M2922_InventoryItem)foundItemList[i].DataDictionary[M2922_Inventory.ID_ITEM].Reference;
-                Inventory._RemoveItem(item);
+                Inventory._ConsumeItemByName(ItemsToRemove[x]);
             }
 
             this.Log($"[Requester] {ItemsToRemove.Length} item(s) consommé(s).");
