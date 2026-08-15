@@ -173,7 +173,7 @@ namespace M2922.Editor
             return count;
         }
 
-        private static List<T> FindAll<T>(Scene scene) where T : Component
+        private static List<T> FindAll<T>(Scene scene) where T : UnityEngine.Component
         {
             List<T> result = new List<T>();
             foreach (GameObject root in scene.GetRootGameObjects())
@@ -184,7 +184,7 @@ namespace M2922.Editor
             return result;
         }
 
-        private static int CountActive<T>(Scene scene) where T : Component
+        private static int CountActive<T>(Scene scene) where T : UnityEngine.Component
         {
             int count = 0;
             foreach (GameObject root in scene.GetRootGameObjects())

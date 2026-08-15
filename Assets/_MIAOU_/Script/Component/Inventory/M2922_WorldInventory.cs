@@ -418,8 +418,8 @@ namespace M2922.Component.Inventory
                 return;
             }
 
-            DataList stack = new DataList();
-            stack.Add(item);
+            DataList newStack = new DataList();
+            newStack.Add(item);
 
             GameObject buttonObj = Instantiate(ButtonPrefab, ButtonParent);
             buttonObj.name = $"{item.name} Button";
@@ -427,7 +427,7 @@ namespace M2922.Component.Inventory
             DataDictionary itemDictionary = new DataDictionary();
             itemDictionary[ID_BUTTON] = buttonObj;
             itemDictionary[ID_ITEM] = item;
-            itemDictionary[ID_STACK] = stack;
+            itemDictionary[ID_STACK] = newStack;
             ItemList.Add(itemDictionary);
 
             M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
