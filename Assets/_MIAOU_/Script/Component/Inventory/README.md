@@ -22,6 +22,8 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
 | `M2922_InventoryInserter.cs` | Zone de dépôt (trigger) | `None` | `M2922_Base` |
 | `M2922_InventoryInserterUI.cs` | Zone de dépôt avec feedback couleur | `None` | `M2922_InventoryInserter` |
 | `M2922_InventoryButtonUI.cs` | Bouton d'un item dans la liste | `None` | `M2922_Base` |
+| `M2922_MapItemMenu.cs` | **Menu admin de la map** : inventaire de TOUS les items (comme le coffre) | `None` | `M2922_Inventory` |
+| `M2922_MapItemButtonUI.cs` | ⚠ LEGACY : bouton de l'ancien menu admin | `None` | `M2922_Base` |
 | `M2922_InventoryItemGiver.cs` | Interactable qui **donne** des items (1×/monde) | `Manual` | `M2922_Base` |
 | `M2922_InventoryItemRequester.cs` | Interactable qui **consomme** des items | `None` | `M2922_Base` |
 
@@ -105,6 +107,34 @@ prêt). Les inventaires MONDE résolvent les clés via `Manager.GetInventoryItem
 - Un item ne peut être rangé que dans **UN seul coffre** à la fois (gardé par `StoredInWorld`).
 - Les items rangés ne réapparaissent PAS à la déconnexion de leur propriétaire (le coffre les gère).
 - Le premier joueur qui range/retire devient "propriétaire" du coffre le temps de l'opération (relay + retry).
+
+### 7. Menu admin de la map (M2922_MapItemMenu) — inventaire de TOUS les items
+
+Fonctionne COMME un `M2922_WorldInventory` (menu sur place, zone d'insertion,
+bouton Spawn, recherche, tri, détail, poids) mais sa liste contient TOUS les
+items enregistrés auprès du `M2922_Manager` — pas seulement ceux d'un coffre.
+
+1. Même setup UI que l'inventaire personnel/coffre (sections 1-3) :
+   `ButtonPrefab` = bouton `M2922_InventoryButtonUI` (ajouter OPTIONNELLEMENT
+   un TMP `ItemStatus` pour l'état ✔/✘), `ButtonParent`, `SpawnPoint`,
+   `CanvasVisibleChecker`, `Inserter` (zone de dépôt), `MenuContainer`,
+   `SearchingField`, `SortingDropdown`, `ItemIcon/Name/Description`, `SpawnButton`.
+2. Ajouter `M2922_MapItemMenu` sur le GameObject du menu, assigner les
+   références ci-dessus + optionnels : `AdminSpawner` (pour `_RestoreAll` /
+   `_ResetWorld`) et `StatusText` (résumé "X / Y items dans le monde").
+3. Le menu reste SUR PLACE : clic (Interact) pour ouvrir/fermer ; la touche `I`
+   et le regard bas (VR) fonctionnent aussi.
+4. La liste contient TOUS les items de la map : ✔ = dans le monde, ✘ = rangé.
+   Ranger un objet (zone d'insertion) le masque ; le bouton Spawn le fait
+   réapparaître au `SpawnPoint` (ou sur le menu). L'item reste dans la liste
+   dans les deux cas.
+5. Actions : `_RestoreAll` (respawn des items non visibles), `_ResetWorld`
+   (reset complet), `_RebuildMenu` (reconstruction manuelle de la liste).
+
+- L'état vient des items eux-mêmes (Active synchronisé) : aucun `[UdonSynced]`
+  sur ce script. Statuts rafraîchis à l'ouverture, après chaque action, et
+  ≈1×/sec tant que le menu est ouvert.
+- Seuls les `M2922_InventoryItemSynced` peuvent être rangés.
 
 ## Utilisation en jeu
 - **PC** : touche `I` pour ouvrir/fermer le menu (inventaire personnel).

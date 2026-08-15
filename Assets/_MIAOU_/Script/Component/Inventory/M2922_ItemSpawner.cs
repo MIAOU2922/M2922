@@ -17,8 +17,10 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Marqueur ÉDITEUR : crée un POOL d'items (plusieurs préfabs × quantité)
     /// directement dans la scène AVANT l'upload. Les instances démarrent MASQUÉES
-    /// à l'origine (0,0,0) — comme si elles étaient rangées dans un inventaire —
-    /// et sont ensuite spawnables par le menu de la map (M2922_ItemAdminSpawner).
+    /// à l'origine (0,0,0) — comme si elles étaient rangées dans un inventaire :
+    /// sous-arbre du pickup DÉSACTIVÉ dans la scène + _startHidden = true
+    /// (aucun des N items ne s'affiche au chargement du monde).
+    /// Spawnables ensuite par le menu de la map (M2922_ItemAdminSpawner).
     ///
     /// Consommé par l'éditeur (M2922_ItemSpawnerEditor) : bouton "Générer" ou
     /// automatiquement au build (PostProcessScene). Supprimé après génération.

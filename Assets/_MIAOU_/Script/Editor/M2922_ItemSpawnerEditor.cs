@@ -1,9 +1,11 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.Callbacks;
+using UnityEditorInternal;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using VRC.SDK3.Components;
 using M2922.Component.Health;
 using M2922.Component.Inventory;
 using M2922.Core;
@@ -74,8 +76,13 @@ namespace M2922.Editor
         }
 
         /// <summary>
-        /// Marque l'item de l'instance générée pour qu'il démarre masqué
-        /// (M2922_InventoryItem._startHidden = true).
+        /// Marque l'item de l'instance générée pour qu'il démarre masqué :
+        /// 1. M2922_InventoryItem._startHidden = true (le Start le masque au runtime) ;
+        /// 2. désactive IMMÉDIATEMENT le sous-arbre du pickup dans la scène —
+        ///    les items du pool sont "rangés" (masqués) comme dans un inventaire,
+        ///    pas 500 objets actifs empilés en (0,0,0) au chargement du monde.
+        /// ⚠ Ne jamais désactiver le GameObject qui porte le M2922_InventoryItem
+        /// (son Start ne tournerait pas → item non enregistré et non spawnable).
         /// </summary>
         private static void MarkStartHidden(GameObject instance)
         {
@@ -97,6 +104,16 @@ namespace M2922.Editor
                 prop.boolValue = true;
                 iso.ApplyModifiedPropertiesWithoutUndo();
             }
+
+            // Désactive le sous-arbre du pickup DÈS LA GÉNÉRATION (état "rangé").
+            // Si l'item est posé À PLAT sur le pickup (même GameObject), on ne
+            // désactive rien : le flag _startHidden le masquera au Start.
+            VRCPickup pickup = item.Pickup;
+            if (pickup == null)
+                pickup = item.GetComponentInChildren<VRCPickup>(true);
+
+            if (pickup != null && pickup.gameObject != item.gameObject)
+                pickup.gameObject.SetActive(false);
         }
 
         /// <summary>Génère un StackId sur le préfab source si absent (partagé par les instances).</summary>
@@ -209,13 +226,75 @@ namespace M2922.Editor
         }
     }
 
-    /// <summary>Inspector custom du marqueur M2922_ItemSpawner.</summary>
+    /// <summary>
+    /// Inspector custom du marqueur M2922_ItemSpawner.
+    /// Le tableau Entries est affiché comme une liste style CounterUI
+    /// (colonnes # / Prefab / Count + boutons +/-) au lieu de
+    /// "Element 0 → Prefab / Count" du draw default.
+    /// </summary>
     [CustomEditor(typeof(M2922_ItemSpawner))]
     public class M2922_ItemSpawnerEditor : UnityEditor.Editor
     {
+        private SerializedProperty _propEntries;
+        private SerializedProperty _propRemoveAfterGenerate;
+
+        private ReorderableList _entriesList;
+
+        private void OnEnable()
+        {
+            _propEntries = serializedObject.FindProperty("Entries");
+            _propRemoveAfterGenerate = serializedObject.FindProperty("RemoveAfterGenerate");
+
+            BuildEntriesList();
+        }
+
+        private void BuildEntriesList()
+        {
+            _entriesList = new ReorderableList(
+                serializedObject,
+                _propEntries,
+                draggable: true,
+                displayHeader: true,
+                displayAddButton: true,
+                displayRemoveButton: true)
+            {
+                drawHeaderCallback = DrawEntriesHeader,
+                drawElementCallback = DrawEntriesElement,
+                onAddCallback = OnAddEntry,
+                onRemoveCallback = OnRemoveEntry,
+                onReorderCallbackWithDetails = OnReorderEntries,
+                elementHeight = EditorGUIUtility.singleLineHeight + 2f
+            };
+        }
+
         public override void OnInspectorGUI()
         {
-            DrawDefaultInspector();
+            serializedObject.Update();
+
+            // Lazy init : l'inspector peut être construit sans OnEnable().
+            if (_propEntries == null)
+            {
+                _propEntries = serializedObject.FindProperty("Entries");
+                _propRemoveAfterGenerate = serializedObject.FindProperty("RemoveAfterGenerate");
+            }
+            if (_entriesList == null || _entriesList.serializedProperty != _propEntries)
+                BuildEntriesList();
+
+            // Référence de script (lecture seule).
+            SerializedProperty scriptProp = serializedObject.FindProperty("m_Script");
+            if (scriptProp != null)
+            {
+                EditorGUI.BeginDisabledGroup(true);
+                EditorGUILayout.PropertyField(scriptProp, true);
+                EditorGUI.EndDisabledGroup();
+            }
+
+            // ---- ENTRIES (liste custom style CounterUI) ----
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("=== ENTRIES ===", EditorStyles.boldLabel);
+            _entriesList.DoLayoutList();
+
+            EditorGUILayout.PropertyField(_propRemoveAfterGenerate, true);
 
             EditorGUILayout.Space(8);
             EditorGUILayout.HelpBox(
@@ -229,6 +308,66 @@ namespace M2922.Editor
                 M2922_ItemSpawnerGenerator.GenerateAndUpdate(scene);
                 EditorSceneManager.SaveScene(scene);
             }
+
+            serializedObject.ApplyModifiedProperties();
+        }
+
+        // =============================================
+        //  REORDERABLE LIST CALLBACKS
+        // =============================================
+
+        /// <summary>Header : "# | Prefab | Count" (réserve la place des boutons +/-).</summary>
+        private void DrawEntriesHeader(Rect rect)
+        {
+            const float countW = 55f;
+            const float buttonsW = 45f;
+
+            float usable = rect.width - buttonsW;
+
+            EditorGUI.LabelField(new Rect(rect.x, rect.y, 30, rect.height), "#", EditorStyles.miniLabel);
+            EditorGUI.LabelField(new Rect(rect.x + 30, rect.y, usable - 30 - countW - 5, rect.height), "Prefab", EditorStyles.miniLabel);
+            EditorGUI.LabelField(new Rect(rect.x + usable - countW, rect.y, countW, rect.height), "Count", EditorStyles.miniLabel);
+        }
+
+        /// <summary>Ligne : index | Prefab | Count.</summary>
+        private void DrawEntriesElement(Rect rect, int index, bool isActive, bool isFocused)
+        {
+            SerializedProperty entry = _propEntries.GetArrayElementAtIndex(index);
+            SerializedProperty prefabProp = entry.FindPropertyRelative("Prefab");
+            SerializedProperty countProp = entry.FindPropertyRelative("Count");
+
+            const float countW = 55f;
+
+            EditorGUI.LabelField(new Rect(rect.x, rect.y, 25, rect.height), index.ToString());
+            EditorGUI.PropertyField(new Rect(rect.x + 30, rect.y, rect.width - 30 - countW - 5, rect.height), prefabProp, GUIContent.none);
+            EditorGUI.PropertyField(new Rect(rect.x + rect.width - countW, rect.y, countW, rect.height), countProp, GUIContent.none);
+        }
+
+        private void OnAddEntry(ReorderableList list)
+        {
+            if (_propEntries == null) return;
+
+            int idx = _propEntries.arraySize;
+            _propEntries.arraySize++;
+
+            SerializedProperty entry = _propEntries.GetArrayElementAtIndex(idx);
+            entry.FindPropertyRelative("Prefab").objectReferenceValue = null;
+            entry.FindPropertyRelative("Count").intValue = 1;
+        }
+
+        private void OnRemoveEntry(ReorderableList list)
+        {
+            if (_propEntries == null) return;
+
+            int idx = list.index;
+            if (idx >= 0 && idx < _propEntries.arraySize)
+                _propEntries.DeleteArrayElementAtIndex(idx);
+        }
+
+        private void OnReorderEntries(ReorderableList list, int oldIndex, int newIndex)
+        {
+            if (_propEntries == null) return;
+            _propEntries.MoveArrayElement(oldIndex, newIndex);
         }
     }
 }

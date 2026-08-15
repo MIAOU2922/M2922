@@ -28,9 +28,17 @@ namespace M2922.Component.Inventory
         [Tooltip("OPTIONNEL : TMP affichant le nombre d'items dans le stack (masqué si 1).")]
         public TextMeshProUGUI ItemCount;
 
+        [Header("=== STATUT (optionnel) ===")]
+        [Tooltip("OPTIONNEL : TMP affichant l'état de l'item — utilisé par le menu admin de la map.")]
+        public TextMeshProUGUI ItemStatus;
+        [Tooltip("Couleur du statut quand l'item est visible dans le monde.")]
+        public Color StatusActiveColor = new Color(0.30f, 0.85f, 0.35f, 1f);
+        [Tooltip("Couleur du statut quand l'item est rangé / absent.")]
+        public Color StatusInactiveColor = new Color(0.95f, 0.70f, 0.20f, 1f);
+
         [Header("=== RUNTIME (lecture seule) ===")]
         public M2922_Inventory Inventory;
-        public DataDictionary DataItem;
+        [HideInInspector] public DataDictionary DataItem;
 
         /// <summary>Initialisé par M2922_Inventory._AddItem au moment de l'instanciation.</summary>
         public void _Init(M2922_Inventory inventory, DataDictionary dataItem)
@@ -62,6 +70,15 @@ namespace M2922.Component.Inventory
                 ItemCount.text = $"x{count}";
                 ItemCount.gameObject.SetActive(true);
             }
+        }
+
+        /// <summary>Met à jour l'affichage optionnel de l'état (✔ dans le monde / ✘ rangé).</summary>
+        public void _SetStatus(bool active)
+        {
+            if (ItemStatus == null) return;
+
+            ItemStatus.text = active ? "✔ Dans le monde" : "✘ Rangé / absent";
+            ItemStatus.color = active ? StatusActiveColor : StatusInactiveColor;
         }
 
         /// <summary>À lier au onClick du Button.</summary>

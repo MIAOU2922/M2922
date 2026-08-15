@@ -47,8 +47,16 @@ namespace M2922.Core
             // Tailles de registres ajustées au build (avec minimum de sécurité).
             if (_npcMax < 8) _npcMax = 8;
             if (_inventoryItemMax < 8) _inventoryItemMax = 8;
-            _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[_npcMax];
-            _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[_inventoryItemMax];
+
+            // ⚠ NE PAS réallouer aveuglément : l'ordre des Start() entre objets
+            // n'est pas garanti — des items/NPCs peuvent s'être enregistrés
+            // AVANT le Start du Manager (tableaux créés à la volée par
+            // RegisterInventoryItem / RegisterNpc). Une réallocation ici
+            // EFFACERAIT leurs références (registre vide au runtime).
+            _EnsureNpcRegistryCapacity();
+            _EnsureInventoryRegistryCapacity();
+
+            this.Log($"Registres : {_npcCount}/{_npcMax} NPCs, {_inventoryItemCount}/{_inventoryItemMax} items d'inventaire.");
 
             // Vérifier si on est le host
             _isHost = Networking.LocalPlayer != null && Networking.LocalPlayer.isMaster;
@@ -59,6 +67,45 @@ namespace M2922.Core
             this.Log($"Host Player Name: {_hostPlayerName}");
             this.Log($"Player Count: {PlayerCount}");
         }
+
+        /// <summary>
+        /// Garantit la capacité du registre d'items SANS perdre les entrées déjà
+        /// enregistrées (des items peuvent s'enregistrer avant le Start du Manager).
+        /// </summary>
+        private void _EnsureInventoryRegistryCapacity()
+        {
+            if (_inventoryItems != null && _inventoryItems.Length >= _inventoryItemMax) return;
+
+            M2922.Component.Inventory.M2922_InventoryItem[] resized =
+                new M2922.Component.Inventory.M2922_InventoryItem[_inventoryItemMax];
+            if (_inventoryItems != null)
+            {
+                int copy = Math.Min(_inventoryItems.Length, _inventoryItemCount);
+                for (int i = 0; i < copy; i++)
+                    resized[i] = _inventoryItems[i];
+            }
+            _inventoryItems = resized;
+        }
+
+        /// <summary>
+        /// Garantit la capacité du registre NPC SANS perdre les entrées déjà
+        /// enregistrées (même raison que pour les items d'inventaire).
+        /// </summary>
+        private void _EnsureNpcRegistryCapacity()
+        {
+            if (_npcReceivers != null && _npcReceivers.Length >= _npcMax) return;
+
+            M2922.Component.Health.M2922_DamageReceiver[] resized =
+                new M2922.Component.Health.M2922_DamageReceiver[_npcMax];
+            if (_npcReceivers != null)
+            {
+                int copy = Math.Min(_npcReceivers.Length, _npcCount);
+                for (int i = 0; i < copy; i++)
+                    resized[i] = _npcReceivers[i];
+            }
+            _npcReceivers = resized;
+        }
+
         public override void OnPlayerJoined(VRCPlayerApi player)
         {
             this.Log($"Player joined: {player.displayName}");
@@ -138,8 +185,13 @@ namespace M2922.Core
         public int RegisterNpc(M2922.Component.Health.M2922_DamageReceiver receiver)
         {
             if (_npcReceivers == null)
-                _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[_npcMax];
-            if (_npcCount >= _npcMax) return -1;
+            {
+                // Créé à la volée AVANT le Start du Manager (ordre des Starts
+                // non garanti) : taille clampée comme dans Start.
+                int size = Math.Max(_npcMax, 8);
+                _npcReceivers = new M2922.Component.Health.M2922_DamageReceiver[size];
+            }
+            if (_npcCount >= _npcReceivers.Length) return -1;
             int id = _npcCount;
             _npcReceivers[_npcCount] = receiver;
             _npcCount++;
@@ -165,7 +217,12 @@ namespace M2922.Core
             if (item == null) return;
 
             if (_inventoryItems == null)
-                _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[_inventoryItemMax];
+            {
+                // Créé à la volée AVANT le Start du Manager (ordre des Starts
+                // non garanti) : taille clampée comme dans Start.
+                int size = Math.Max(_inventoryItemMax, 8);
+                _inventoryItems = new M2922.Component.Inventory.M2922_InventoryItem[size];
+            }
 
             // Anti-doublon (OnManagerReady peut être rappelé, ou self-heal du coffre).
             for (int i = 0; i < _inventoryItemCount; i++)
@@ -189,7 +246,11 @@ namespace M2922.Core
                 return;
             }
 
-            if (_inventoryItemCount >= _inventoryItemMax) return;
+            if (_inventoryItemCount >= _inventoryItems.Length)
+            {
+                this.Warning($"[Manager] Registre d'items PLEIN ({_inventoryItemCount}/{_inventoryItems.Length}) : '{item.ItemName}' ignoré.");
+                return;
+            }
 
             _inventoryItems[_inventoryItemCount] = item;
             _inventoryItemCount++;
