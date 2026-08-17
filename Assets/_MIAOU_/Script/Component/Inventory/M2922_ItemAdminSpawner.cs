@@ -1,6 +1,7 @@
 using UdonSharp;
 using UnityEngine;
 using VRC.SDKBase;
+using VRC.SDK3.Data;
 using M2922.Core;
 
 namespace M2922.Component.Inventory
@@ -10,11 +11,12 @@ namespace M2922.Component.Inventory
     /// M2922_Manager (chaque item s'enregistre LUI-MÊME au Start) et permet de
     /// les (re)spawner — reset de monde, réapparition d'items perdus…
     ///
-    /// Items synced : on demande l'ownership avant de spawner pour que l'état
-    /// Active soit diffusé aux autres joueurs (spawn local immédiat, propagation
-    /// réseau au tick Continuous suivant).
+    /// Items synced (MANUAL) : le spawn passe par une FILE traitée
+    /// progressivement — on attend l'ownership avant de spawner pour que l'état
+    /// Active soit bien diffusé (RequestSerialization), par lots de 10, sans
+    /// jamais bloquer une frame (maps 500-5000 items).
     ///
-    /// PERF : 100% événementiel (aucun Update).
+    /// PERF : 100% événementiel (aucun Update, uniquement des events différés).
     /// </summary>
     [AddComponentMenu("M2922/Inventory/Admin Spawner")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
@@ -23,6 +25,13 @@ namespace M2922.Component.Inventory
         [Header("=== SPAWN ===")]
         [Tooltip("Point de spawn optionnel. Si vide, chaque item réapparaît à sa position d'origine.")]
         public Transform SpawnPoint;
+
+        // File des items en attente d'ownership avant spawn (sync MANUAL :
+        // Active ne part que si on possède l'objet au moment du RequestSerialization).
+        private DataList _pendingSpawnQueue = new DataList();
+        private int _pendingRetries = 0;
+        private const int MAX_RETRIES = 5;
+        private const int BATCH = 10;
 
         /// <summary>Nombre d'items enregistrés dans la map.</summary>
         public int _GetItemCount()
@@ -109,15 +118,64 @@ namespace M2922.Component.Inventory
 
         private void _SpawnItem(M2922_InventoryItem item)
         {
-            // Libère l'item d'un éventuel inventaire MONDE avant de le spawner.
-            item._SetWorldStored(false);
+            if (item == null) return;
 
-            // Items synced : ownership nécessaire pour diffuser l'état Active.
-            if (item._IsNetworked() && !Networking.IsOwner(item.gameObject))
-                Networking.SetOwner(Networking.LocalPlayer, item.gameObject);
+            // File traitée progressivement : les items non possédés attendent
+            // leur transfert d'ownership avant le spawn (sync MANUAL).
+            _pendingSpawnQueue.Add(item);
+            SendCustomEventDelayedFrames("_TrySpawnNextPending", 1);
+        }
 
-            Transform point = SpawnPoint != null ? SpawnPoint : item.transform;
-            item._Spawn(point);
+        /// <summary>
+        /// Traite la file de spawn par lots (BATCH items max) :
+        /// - item possédé (ou local) → spawn immédiat ;
+        /// - item synced non possédé → demande d'ownership puis retry différé.
+        /// Se reprogramme tant que la file n'est pas vide (jamais plus d'un
+        /// batch par frame → aucun pic de calcul, même avec des milliers d'items).
+        /// </summary>
+        public void _TrySpawnNextPending()
+        {
+            int processed = 0;
+
+            while (_pendingSpawnQueue.Count > 0 && processed < BATCH)
+            {
+                M2922_InventoryItem item = (M2922_InventoryItem)_pendingSpawnQueue[0].Reference;
+                if (item == null)
+                {
+                    _pendingSpawnQueue.RemoveAt(0);
+                    continue;
+                }
+
+                if (item._IsNetworked() && !Networking.IsOwner(item.gameObject))
+                {
+                    _pendingRetries++;
+                    if (_pendingRetries > MAX_RETRIES)
+                    {
+                        this.Warning("[AdminSpawner] Ownership de l'item impossible, spawn annulé.");
+                        _pendingSpawnQueue.RemoveAt(0);
+                        _pendingRetries = 0;
+                        continue;
+                    }
+
+                    Networking.SetOwner(Networking.LocalPlayer, item.gameObject);
+                    SendCustomEventDelayedSeconds("_TrySpawnNextPending", 0.5f);
+                    return;
+                }
+
+                _pendingSpawnQueue.RemoveAt(0);
+                _pendingRetries = 0;
+
+                // Libère l'item d'un éventuel inventaire MONDE, puis spawn.
+                item._SetWorldStored(false);
+
+                Transform point = SpawnPoint != null ? SpawnPoint : item.transform;
+                item._Spawn(point);
+
+                processed++;
+            }
+
+            if (_pendingSpawnQueue.Count > 0)
+                SendCustomEventDelayedFrames("_TrySpawnNextPending", 1);
         }
     }
 }

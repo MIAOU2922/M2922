@@ -23,7 +23,6 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
 | `M2922_InventoryInserterUI.cs` | Zone de dépôt avec feedback couleur | `None` | `M2922_InventoryInserter` |
 | `M2922_InventoryButtonUI.cs` | Bouton d'un item dans la liste | `None` | `M2922_Base` |
 | `M2922_MapItemMenu.cs` | **Menu admin de la map** : inventaire de TOUS les items (comme le coffre) | `None` | `M2922_Inventory` |
-| `M2922_MapItemButtonUI.cs` | ⚠ LEGACY : bouton de l'ancien menu admin | `None` | `M2922_Base` |
 | `M2922_InventoryItemGiver.cs` | Interactable qui **donne** des items (1×/monde) | `Manual` | `M2922_Base` |
 | `M2922_InventoryItemRequester.cs` | Interactable qui **consomme** des items | `None` | `M2922_Base` |
 
@@ -33,13 +32,14 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
 - Créer (ou reprendre) un GameObject "Inventory System" avec le canvas du menu.
 - Ajouter `M2922_Inventory` (menu **M2922 → Inventory → Inventory**).
 - Assigner : `ButtonPrefab`, `ButtonParent` (contenu ScrollView), `SpawnPoint`,
-  `CanvasVisibleChecker`, `Inserter`, et toutes les références UI (MenuContainer,
-  SearchingField, SortingDropdown, ItemIcon, ItemName, ItemDescription, SpawnButton).
+  `Inserter`, et toutes les références UI (`MenuContainer` = racine du menu,
+  `SearchingField` (`TMP_InputField`), `SortingDropdown` (`TMP_Dropdown`),
+  ItemIcon, ItemName, ItemDescription, SpawnButton).
 - Lier les events Unity UI :
   - `SearchingField.onValueChanged` → `_SearchForItems`
   - `SortingDropdown.onValueChanged` → `_SetSorting`
   - `SpawnButton.onClick` → `_SpawnItem`
-- Dropdown de tri : **0 = Latest, 1 = AZ** (ordre de l'enum).
+- Dropdown de tri (TMP) : **0 = Latest, 1 = AZ** (ordre de l'enum).
 
 ### 2. Le bouton d'item (M2922_InventoryButtonUI)
 - Prefab "Item Button" : racine avec un `Button` Unity + une `Image` (icône) + un TMP (nom).
@@ -47,7 +47,8 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
 - Lier `Button.onClick` → `_OnClick`.
 
 ### 3. La zone d'insertion (M2922_InventoryInserterUI)
-- GameObject avec un **Collider en Trigger** + un **Rigidbody** (kinematic).
+- GameObject avec un **Collider en Trigger** (pas de Rigidbody nécessaire sur
+  la zone : le pickup déposé en a déjà un, un trigger statique suffit).
 - Ajouter `M2922_InventoryInserterUI`, assigner `SpriteImage`, `IdleColor`, `DroppingColor`.
 - Assigner cette zone à `Inventory.Inserter`.
 
@@ -69,13 +70,15 @@ Portage du système "Pickup Inventory" de Vowgan vers les conventions M2922
 - Le script vit sur la **racine** (qui reste active) et désactive/réactive le
   sous-arbre du `VRCPickup` : la sync `Active` continue de fonctionner
   (un UdonBehaviour désactivé ne reçoit plus `OnDeserialization`).
-- Mode de sync **Continuous** : compatible avec un `VRCObjectSync` (ici sur un
-  enfant). Le SDK refuse `VRCObjectSync` + Udon **Manual** sur le même objet.
+- Mode de sync **Manual** : AUCUN envoi par tick (maps 500-5000 items) —
+  `Active`/`StoredInWorld` ne partent que sur `RequestSerialization()` (appelé
+  par `_Spawn`/`_Hide`/`_SetWorldStored`). ⚠ Le SDK refuse `VRCObjectSync` +
+  Udon **Manual** sur le MÊME GameObject → encapsulation OBLIGATOIRE
+  (`VRCObjectSync` sur le pickup enfant, jamais sur la racine du script).
 - Le `Pickup` est auto-détecté (y compris dans les enfants) ; le Proxy est placé
   sur le même GameObject que le `VRCPickup`.
-- Si le script est posé **à plat** sur le GameObject du pickup (ancien setup),
-  un fallback cache uniquement renderers/colliders/particles — l'encapsulation
-  reste recommandée pour désactiver aussi les scripts/animators du contenu.
+- Le setup **à plat** (script sur le même GameObject que le pickup) n'est PLUS
+  supporté (Error au Start) : l'encapsulation est obligatoire en Manual.
 
 **Enregistrement automatique** : chaque `M2922_InventoryItem` s'enregistre
 LUI-MÊME auprès du `M2922_Manager` au Start (retry si le Manager n'est pas encore
@@ -117,7 +120,7 @@ items enregistrés auprès du `M2922_Manager` — pas seulement ceux d'un coffre
 1. Même setup UI que l'inventaire personnel/coffre (sections 1-3) :
    `ButtonPrefab` = bouton `M2922_InventoryButtonUI` (ajouter OPTIONNELLEMENT
    un TMP `ItemStatus` pour l'état ✔/✘), `ButtonParent`, `SpawnPoint`,
-   `CanvasVisibleChecker`, `Inserter` (zone de dépôt), `MenuContainer`,
+   `Inserter` (zone de dépôt), `MenuContainer` (racine du menu),
    `SearchingField`, `SortingDropdown`, `ItemIcon/Name/Description`, `SpawnButton`.
 2. Ajouter `M2922_MapItemMenu` sur le GameObject du menu, assigner les
    références ci-dessus + optionnels : `AdminSpawner` (pour `_RestoreAll` /

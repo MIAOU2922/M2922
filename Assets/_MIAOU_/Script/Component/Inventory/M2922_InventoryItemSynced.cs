@@ -11,21 +11,26 @@ namespace M2922.Component.Inventory
     /// <summary>
     /// Item d'inventaire SYNCHRONISÉ : visible/masqué pour tous les joueurs.
     ///
-    /// ⚠ SYNC : mode CONTINUOUS (pas Manual) — le SDK interdit de partager un
-    /// GameObject entre un VRCObjectSync et un UdonBehaviour MANUAL
-    /// (erreur "Object Sync cannot share an object with a manually synchronized
-    /// Udon Behaviour" au build).
+    /// ⚠ SYNC : mode MANUAL — AUCUN envoi réseau par tick (maps 500-5000 items) :
+    /// Active / StoredInWorld ne partent QUE sur RequestSerialization()
+    /// (déjà appelé par _Spawn / _Hide / _SetWorldStored).
     ///
-    /// HIÉRARCHIE RECOMMANDÉE (encapsulation d'un pickup existant) :
+    /// ⚠ RÈGLE SDK : un GameObject ne peut PAS porter à la fois un VRCObjectSync
+    /// et un UdonBehaviour MANUAL (erreur "Object Sync cannot share an object
+    /// with a manually synchronized Udon Behaviour" au build). L'encapsulation
+    /// est donc OBLIGATOIRE : ce script sur la RACINE, VRCObjectSync sur le
+    /// pickup ENFANT (jamais sur le même GameObject).
+    ///
+    /// HIÉRARCHIE REQUISE (encapsulation d'un pickup existant) :
     ///   Root   → M2922_InventoryItemSynced (ce script, TOUJOURS actif)
     ///     └─ Pickup → VRCPickup + VRCObjectSync + M2922_InventoryProxy + scripts du prop
     ///         └─ Contenu (mesh, colliders, renderers, particles, …)
     ///
     /// Le script vit sur la RACINE et désactive/réactive le sous-arbre du
-    /// VRCPickup : la sync Continuous continue de recevoir OnDeserialization
+    /// VRCPickup : la sync Manual continue de recevoir OnDeserialization
     /// (un UdonBehaviour sur un GameObject désactivé ne reçoit plus rien).
-    /// Si le script est posé À PLAT sur le pickup (ancien setup), un fallback
-    /// cache uniquement renderers/colliders/particles.
+    /// ⚠ Le setup "À PLAT" (script sur le même GameObject que le pickup) n'est
+    /// PLUS supporté : _Init() logge une Error et désactive le comportement.
     ///
     /// Comportement réseau :
     ///   - [UdonSynced] Active : état visible/masqué répliqué à tous.
@@ -33,7 +38,7 @@ namespace M2922.Component.Inventory
     ///     réapparaître (anti-perte d'objet).
     /// </summary>
     [AddComponentMenu("M2922/Inventory/Item Synced")]
-    [UdonBehaviourSyncMode(BehaviourSyncMode.Continuous)]
+    [UdonBehaviourSyncMode(BehaviourSyncMode.Manual)]
     public class M2922_InventoryItemSynced : M2922_InventoryItem
     {
         [Header("=== DONNÉES SYNCHRONISÉES ===")]
@@ -43,67 +48,38 @@ namespace M2922.Component.Inventory
 
         private VRCObjectSync _objectSync;
         private bool _initialized;
-        private bool _isOnPickupRoot;
-
-        // Fallback (setup À PLAT : item sur le même GameObject que le pickup).
-        private Renderer[] _renderers;
-        private Collider[] _colliders;
-        private ParticleSystem[] _particles;
 
         public override void _Init()
         {
             base._Init();
             if (Pickup == null) return;
 
+            // Encapsulation OBLIGATOIRE en Manual : ce script sur la RACINE,
+            // le VRCPickup sur un enfant (jamais le même GameObject).
+            if (Pickup.gameObject == gameObject)
+            {
+                this.Error("[ItemSynced] Setup À PLAT non supporté : placez ce script sur la RACINE et le VRCPickup sur un enfant.");
+                return;
+            }
+
             _objectSync = Pickup.GetComponent<VRCObjectSync>();
             if (_objectSync == null)
                 this.Warning($"[ItemSynced] Aucun VRCObjectSync trouvé sur '{Pickup.name}' !");
 
-            // Hiérarchie encapsulée : on peut désactiver le sous-arbre du pickup
-            // sans couper la sync de CE script (il reste sur la racine active).
-            // Si le script est encore posé à plat sur le pickup, fallback composants.
-            _isOnPickupRoot = Pickup.gameObject == gameObject;
-
-            if (_isOnPickupRoot)
-            {
-                _renderers = Pickup.GetComponentsInChildren<Renderer>(true);
-                _colliders = Pickup.GetComponentsInChildren<Collider>(true);
-                _particles = Pickup.GetComponentsInChildren<ParticleSystem>(true);
-            }
+            // ⚠ MANUAL : le SDK refuse VRCObjectSync + UdonBehaviour MANUAL sur
+            // le MÊME GameObject. Le VRCObjectSync doit être sur le pickup
+            // ENFANT, jamais sur la racine de ce script.
+            if (GetComponent<VRCObjectSync>() != null)
+                this.Error("[ItemSynced] VRCObjectSync sur le MÊME GameObject que ce script Manual → erreur de build ! Déplacez-le sur le pickup enfant.");
 
             _initialized = true;
         }
 
         private void _SetVisualActive(bool active)
         {
-            if (_isOnPickupRoot)
-            {
-                // ⚠ Ne JAMAIS désactiver la racine d'un objet synchronisé : un
-                // UdonBehaviour inactif ne reçoit plus OnDeserialization.
-                if (_renderers != null)
-                {
-                    for (int i = 0; i < _renderers.Length; i++)
-                        if (_renderers[i] != null) _renderers[i].enabled = active;
-                }
-
-                if (_colliders != null)
-                {
-                    for (int i = 0; i < _colliders.Length; i++)
-                        if (_colliders[i] != null) _colliders[i].enabled = active;
-                }
-
-                if (!active && _particles != null)
-                {
-                    for (int i = 0; i < _particles.Length; i++)
-                        if (_particles[i] != null) _particles[i].Stop();
-                }
-            }
-            else
-            {
-                // Désactive/réactive tout le sous-arbre du pickup (scripts,
-                // animators, colliders, renderers, particles…).
-                Pickup.gameObject.SetActive(active);
-            }
+            // Désactive/réactive tout le sous-arbre du pickup (scripts,
+            // animators, colliders, renderers, particles…).
+            Pickup.gameObject.SetActive(active);
         }
 
         public override void OnOwnershipTransferred(VRCPlayerApi player)

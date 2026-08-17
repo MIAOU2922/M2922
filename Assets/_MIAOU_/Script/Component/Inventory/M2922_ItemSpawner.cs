@@ -15,15 +15,19 @@ namespace M2922.Component.Inventory
     }
 
     /// <summary>
-    /// Marqueur ÉDITEUR : crée un POOL d'items (plusieurs préfabs × quantité)
-    /// directement dans la scène AVANT l'upload. Les instances démarrent MASQUÉES
-    /// à l'origine (0,0,0) — comme si elles étaient rangées dans un inventaire :
-    /// sous-arbre du pickup DÉSACTIVÉ dans la scène + _startHidden = true
-    /// (aucun des N items ne s'affiche au chargement du monde).
+    /// Marqueur ÉDITEUR : décrit un POOL d'items (plusieurs préfabs × quantité).
+    /// Les instances sont dupliquées AUTOMATIQUEMENT à la compilation :
+    ///   - entrée en Play Mode (ClientSim / Build & Test),
+    ///   - build / upload (PostProcessScene).
+    /// La scène éditée reste propre (pas d'instance de pool dans la hiérarchie).
+    /// Les instances sont PARENTÉES à ce marqueur (position locale 0,0,0) et
+    /// démarrent MASQUÉES — comme si elles
+    /// étaient rangées dans un inventaire : sous-arbre du pickup DÉSACTIVÉ +
+    /// _startHidden = true (aucun des N items ne s'affiche au chargement).
     /// Spawnables ensuite par le menu de la map (M2922_ItemAdminSpawner).
     ///
-    /// Consommé par l'éditeur (M2922_ItemSpawnerEditor) : bouton "Générer" ou
-    /// automatiquement au build (PostProcessScene). Supprimé après génération.
+    /// Consommé par l'éditeur (M2922_ItemSpawnerEditor) : hook Play Mode +
+    /// PostProcessScene. Supprimé après génération (RemoveAfterGenerate).
     /// </summary>
     [AddComponentMenu("M2922/Inventory/Item Spawner (Editor)")]
     public class M2922_ItemSpawner : MonoBehaviour

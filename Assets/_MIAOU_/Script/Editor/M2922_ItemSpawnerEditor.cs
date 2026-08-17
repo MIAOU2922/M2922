@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using UdonSharp;
 using UnityEditor;
 using UnityEditor.Callbacks;
 using UnityEditorInternal;
@@ -6,6 +7,8 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using VRC.SDK3.Components;
+using VRC.Udon;
+using UdonSharpEditor;
 using M2922.Component.Health;
 using M2922.Component.Inventory;
 using M2922.Core;
@@ -22,10 +25,97 @@ namespace M2922.Editor
         private const int MIN_REGISTRY = 32;
         private const int REGISTRY_MARGIN = 16;
 
+        /// <summary>
+        /// Préfabs sources dont le StackId a été généré pendant la génération —
+        /// synchronisés proxy → Udon APRÈS la génération (les assets ne sont pas
+        /// dans la scène : SyncAllProxiesToUdon ne les voit pas).
+        /// </summary>
+        private static readonly HashSet<M2922_InventoryItem> _pendingPrefabSourceSync =
+            new HashSet<M2922_InventoryItem>();
+
+        /// <summary>
+        /// Ordre IMPORTANT : la GÉNÉRATION (instances, flags, StackId) doit être
+        /// terminée AVANT toute opération Udon. Les méthodes de génération ne
+        /// font donc AUCUN appel UdonSharpEditorUtility ; tout le proxy → Udon
+        /// est fait ici, après.
+        /// </summary>
         public static void GenerateAndUpdate(Scene scene)
         {
+            _pendingPrefabSourceSync.Clear();
+
+            // 1. GÉNÉRATION pure (instances, _startHidden, StackId, pickup off).
             GenerateAllInScene(scene);
+
+            // 2. UDON : sync proxy → programme sur TOUTE la scène (les instances
+            //    générées sont incluses). ⚠ Au start du play mode, l'UdonBehaviour
+            //    écrase les champs des proxies C# avec SES bytes sérialisés ; si
+            //    ces bytes sont vides (préfabs jamais synchronisés), TOUTES les
+            //    variables semblent "écrasées" (None / défauts). UdonSharp ne
+            //    pousse proxy → Udon qu'au BUILD : on le fait donc ici, après la
+            //    génération.
+            SyncAllProxiesToUdon(scene);
+
+            // 3. UDON : sync des préfabs SOURCES touchés (StackId généré) —
+            //    pas couverts par l'étape 2.
+            SyncPendingPrefabSources();
+
             UpdateManagerRegistrySizes(scene);
+        }
+
+        /// <summary>
+        /// Pousse les valeurs des proxies C# vers leur UdonBehaviour pour TOUS les
+        /// UdonSharpBehaviours de la scène (équivalent de ce que fait UdonSharp au
+        /// build). Sans ça, le runtime écrase les champs au play mode avec des bytes
+        /// vides → perte apparente de toutes les variables des préfabs.
+        /// </summary>
+        public static void SyncAllProxiesToUdon(Scene scene)
+        {
+            int synced = 0;
+            foreach (GameObject root in scene.GetRootGameObjects())
+            {
+                UdonSharpBehaviour[] behaviours = root.GetComponentsInChildren<UdonSharpBehaviour>(true);
+                for (int i = 0; i < behaviours.Length; i++)
+                {
+                    UdonSharpBehaviour behaviour = behaviours[i];
+                    if (behaviour == null) continue;
+
+                    try
+                    {
+                        if (UdonSharpEditorUtility.GetBackingUdonBehaviour(behaviour) != null)
+                        {
+                            UdonSharpEditorUtility.CopyProxyToUdon(behaviour, ProxySerializationPolicy.All);
+                            synced++;
+                        }
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogWarning($"[ItemSpawner] Sync proxy → Udon impossible sur '{behaviour.name}' ({behaviour.GetType().Name}) : {e.Message}");
+                    }
+                }
+            }
+
+            if (synced > 0)
+                Debug.Log($"[ItemSpawner] {synced} comportement(s) UdonSharp synchronisé(s) proxy → Udon.");
+        }
+
+        /// <summary>
+        /// Sync proxy → programme Udon des PRÉFABS SOURCES dont le StackId a été
+        /// généré pendant GenerateAllInScene. Appelé APRÈS la génération.
+        /// </summary>
+        private static void SyncPendingPrefabSources()
+        {
+            foreach (M2922_InventoryItem source in _pendingPrefabSourceSync)
+            {
+                if (source == null) continue;
+
+                // Garde : le backing UdonBehaviour d'un asset non initialisé
+                // peut être null → CopyProxyToUdon planterait.
+                if (source.GetComponent<UdonBehaviour>() != null &&
+                    UdonSharpEditorUtility.GetBackingUdonBehaviour(source) != null)
+                    UdonSharpEditorUtility.CopyProxyToUdon(source);
+            }
+
+            _pendingPrefabSourceSync.Clear();
         }
 
         /// <summary>
@@ -52,10 +142,11 @@ namespace M2922.Editor
                         GameObject instance = (GameObject)PrefabUtility.InstantiatePrefab(entry.Prefab);
                         if (instance == null) continue;
 
-                        // Pool : origine (0,0,0), rotation identité, démarre masqué.
-                        instance.transform.SetParent(null);
-                        instance.transform.position = Vector3.zero;
-                        instance.transform.rotation = Quaternion.identity;
+                        // Pool : parenté au marqueur M2922_ItemSpawner, position
+                        // locale (0,0,0), rotation identité, démarre masqué.
+                        instance.transform.SetParent(spawner.transform, false);
+                        instance.transform.localPosition = Vector3.zero;
+                        instance.transform.localRotation = Quaternion.identity;
                         instance.name = $"{entry.Prefab.name} (Pool {i + 1})";
 
                         MarkStartHidden(instance);
@@ -65,12 +156,21 @@ namespace M2922.Editor
                 }
 
                 if (spawner.RemoveAfterGenerate)
+                {
+                    // Détache les instances poolées AVANT de supprimer le
+                    // marqueur (sinon DestroyImmediate détruirait ses enfants).
+                    while (spawner.transform.childCount > 0)
+                        spawner.transform.GetChild(0).SetParent(null);
                     Object.DestroyImmediate(spawner);
+                }
             }
 
             if (created > 0)
             {
-                EditorSceneManager.MarkSceneDirty(scene);
+                // En play mode / build, Unity gère lui-même l'état de la scène
+                // (les instances de play mode sont retirées au retour en édition).
+                if (!EditorApplication.isPlayingOrWillChangePlaymode)
+                    EditorSceneManager.MarkSceneDirty(scene);
                 Debug.Log($"[ItemSpawner] {created} instance(s) ajoutée(s) au pool.");
             }
         }
@@ -105,6 +205,11 @@ namespace M2922.Editor
                 iso.ApplyModifiedPropertiesWithoutUndo();
             }
 
+            // ⚠ UDON : AUCUNE opération Udon ici. La sync proxy → programme des
+            // instances générées est faite APRÈS toute la génération, par
+            // SyncAllProxiesToUdon(scene) dans GenerateAndUpdate (ordre garanti :
+            // génération AVANT Udon).
+
             // Désactive le sous-arbre du pickup DÈS LA GÉNÉRATION (état "rangé").
             // Si l'item est posé À PLAT sur le pickup (même GameObject), on ne
             // désactive rien : le flag _startHidden le masquera au Start.
@@ -130,6 +235,12 @@ namespace M2922.Editor
             {
                 p.stringValue = System.Guid.NewGuid().ToString("N");
                 so.ApplyModifiedPropertiesWithoutUndo();
+
+                // ⚠ UDON : pas de sync ici (génération AVANT Udon). Le source est
+                // enregistré pour être synchronisé après la génération, dans
+                // SyncPendingPrefabSources (appelé par GenerateAndUpdate).
+                _pendingPrefabSourceSync.Add(source);
+
                 EditorUtility.SetDirty(source);
             }
         }
@@ -214,6 +325,26 @@ namespace M2922.Editor
         }
     }
 
+    /// <summary>
+    /// Menu M2922 : génération manuelle du pool d'items dans la scène active.
+    /// </summary>
+    public static class M2922_ItemSpawnerMenu
+    {
+        [MenuItem("M2922/Inventory/Generate Item Pool (Active Scene)", priority = 30)]
+        public static void GeneratePool()
+        {
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.IsValid())
+            {
+                Debug.LogWarning("[ItemSpawner] Aucune scène active : génération du pool impossible.");
+                return;
+            }
+
+            M2922_ItemSpawnerGenerator.GenerateAndUpdate(scene);
+            EditorSceneManager.SaveScene(scene);
+        }
+    }
+
     /// <summary>Génération automatique au moment du build (par scène traitée).</summary>
     public static class M2922_InventoryBuildProcessor
     {
@@ -222,6 +353,30 @@ namespace M2922.Editor
         {
             Scene scene = EditorSceneManager.GetActiveScene();
             if (!scene.IsValid()) return;
+            M2922_ItemSpawnerGenerator.GenerateAndUpdate(scene);
+        }
+    }
+
+    /// <summary>
+    /// Duplication automatique à l'ENTRÉE EN PLAY MODE (ClientSim / Build & Test).
+    /// Les instances créées en play mode sont retirées automatiquement au retour
+    /// en mode édition (Unity restaure la scène) → la hiérarchie éditeur reste propre.
+    /// </summary>
+    public static class M2922_ItemSpawnerPlayModeHook
+    {
+        [InitializeOnLoadMethod]
+        private static void Register()
+        {
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+        }
+
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
+        {
+            if (state != PlayModeStateChange.ExitingEditMode) return;
+
+            Scene scene = EditorSceneManager.GetActiveScene();
+            if (!scene.IsValid()) return;
+
             M2922_ItemSpawnerGenerator.GenerateAndUpdate(scene);
         }
     }
@@ -298,16 +453,11 @@ namespace M2922.Editor
 
             EditorGUILayout.Space(8);
             EditorGUILayout.HelpBox(
-                "Génère les instances dans la scène AVANT l'upload (les objets réseau " +
-                "doivent exister dans la scène). Le bouton sauve la scène après génération.",
+                "DUPLICATION AUTOMATIQUE à la compilation : les préfabs sont instanciés " +
+                "à l'entrée en Play Mode (ClientSim / Build & Test) et au build/upload " +
+                "(PostProcessScene). La scène reste PROPRE en édition : aucune instance " +
+                "de pool dans la hiérarchie.",
                 MessageType.Info);
-
-            if (GUILayout.Button("Générer dans la scène (et sauver)"))
-            {
-                Scene scene = EditorSceneManager.GetActiveScene();
-                M2922_ItemSpawnerGenerator.GenerateAndUpdate(scene);
-                EditorSceneManager.SaveScene(scene);
-            }
 
             serializedObject.ApplyModifiedProperties();
         }

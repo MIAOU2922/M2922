@@ -11,13 +11,13 @@ namespace M2922.Component.Inventory
     /// Zone d'insertion de l'inventaire : quand le joueur y lâche un objet
     /// portant un M2922_InventoryProxy, l'objet est rangé dans l'inventaire.
     ///
-    /// SETUP : Collider en Trigger sur ce GameObject + Rigidbody (kinematic).
+    /// SETUP : Collider en Trigger sur ce GameObject (pas besoin de Rigidbody
+    /// sur la zone : le pickup déposé en a déjà un, un trigger statique suffit).
     /// Le collider de l'objet doit porter le M2922_InventoryProxy.
     ///
     /// PERF : 100% événementiel (OnTriggerEnter/Exit, aucun Update).
     /// </summary>
     [AddComponentMenu("M2922/Inventory/Inserter")]
-    [RequireComponent(typeof(Rigidbody))]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class M2922_InventoryInserter : M2922_Base
     {

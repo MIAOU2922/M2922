@@ -46,8 +46,6 @@ namespace M2922.Component.Inventory
         [Header("=== COMPORTEMENT ===")]
         [Tooltip("Méthode de tri de la liste (Latest = plus récent d'abord, AZ = alphabétique).")]
         public M2922_InventorySorting Sorting = M2922_InventorySorting.Latest;
-        [Tooltip("Au-delà de cette distance du système, rouvrir le menu le déplace devant le joueur au lieu de fermer.")]
-        public float SpawnInsteadOfCloseDistance = 1;
         [Tooltip("Distance au-delà de laquelle le menu se ferme automatiquement.")]
         public float HideDistance = 5;
         [Tooltip("Poids maximum que l'inventaire peut contenir. -1 = pas de limite.")]
@@ -60,18 +58,16 @@ namespace M2922.Component.Inventory
         public Transform ButtonParent;
         [Tooltip("Point d'apparition des objets sortis de l'inventaire.")]
         public Transform SpawnPoint;
-        [Tooltip("Renderer d'un collider placé autour du système : sa visibilité sert de test de proximité.")]
-        public MeshRenderer CanvasVisibleChecker;
         [Tooltip("Zone d'insertion (M2922_InventoryInserter).")]
         public M2922_InventoryInserter Inserter;
 
         [Header("=== UI ===")]
         [Tooltip("Racine du menu (canvas).")]
         public GameObject MenuContainer;
-        [Tooltip("Champ de recherche.")]
-        public InputField SearchingField;
-        [Tooltip("Dropdown de tri (0 = Latest, 1 = AZ).")]
-        public Dropdown SortingDropdown;
+        [Tooltip("Champ de recherche (TMP_InputField).")]
+        public TMP_InputField SearchingField;
+        [Tooltip("Dropdown de tri TMP (0 = Latest, 1 = AZ).")]
+        public TMP_Dropdown SortingDropdown;
         [Tooltip("Icône de l'item sélectionné (panneau de détail).")]
         public Image ItemIcon;
         [Tooltip("Nom de l'item sélectionné.")]
@@ -131,13 +127,23 @@ namespace M2922.Component.Inventory
             // Fermeture auto si le joueur est trop loin — seulement tous les N frames (perf).
             if (ShouldUpdate())
             {
-                float dist = Vector3.Distance(_localPlayer.GetPosition(), transform.position);
-                if (dist > HideDistance)
-                {
-                    if (CanvasVisibleChecker == null || !CanvasVisibleChecker.isVisible)
-                        _CloseMenu();
-                }
+                _UpdateDistanceCulling();
             }
+        }
+
+        /// <summary>
+        /// Fermeture auto à distance façon M2922_LookAtCamera : distance
+        /// TÊTE → système. Au-delà de HideDistance : fermeture COMPLÈTE du menu
+        /// via _CloseMenu() (MenuContainer).
+        /// </summary>
+        private void _UpdateDistanceCulling()
+        {
+            VRCPlayerApi.TrackingData tracking = _localPlayer.GetTrackingData(VRCPlayerApi.TrackingDataType.Head);
+            Vector3 headPos = tracking.position;
+            float sqrDist = (headPos - transform.position).sqrMagnitude;
+
+            if (sqrDist > HideDistance * HideDistance)
+                _CloseMenu();
         }
 
         /// <summary>
@@ -156,21 +162,16 @@ namespace M2922.Component.Inventory
         }
 
         /// <summary>
-        /// Bascule l'état du menu. S'il est déjà ouvert :
-        /// loin du système → le menu revient devant le joueur, près → fermeture.
+        /// Bascule l'état du menu : ouvert → ferme, fermé → ouvre
+        /// (le menu suit le joueur à l'ouverture via SpawnAtPlayer).
         /// </summary>
         public void _ToggleMenu()
         {
+            if (MenuContainer == null) return;
+
             if (MenuContainer.activeSelf)
             {
-                if (Vector3.Distance(_localPlayer.GetPosition(), transform.position) > SpawnInsteadOfCloseDistance)
-                {
-                    SpawnAtPlayer();
-                }
-                else
-                {
-                    _CloseMenu();
-                }
+                _CloseMenu();
             }
             else
             {

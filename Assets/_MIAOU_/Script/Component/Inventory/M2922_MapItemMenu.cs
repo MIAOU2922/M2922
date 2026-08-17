@@ -39,9 +39,6 @@ namespace M2922.Component.Inventory
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
     public class M2922_MapItemMenu : M2922_Inventory
     {
-        /// <summary>Clé DataDictionary "Name" (compat M2922_MapItemButtonUI legacy).</summary>
-        public const string ID_NAME = "Name";
-
         private const int MAX_RETRIES = 5;
         private const int STATUS_REFRESH_FRAMES = 60;
 
@@ -369,15 +366,6 @@ namespace M2922.Component.Inventory
 
             AdminSpawner._SpawnAllForced();
             _RefreshStatuses();
-        }
-
-        /// <summary>Compatibilité legacy (M2922_MapItemButtonUI) : spawn l'item référencé.</summary>
-        public void _OnButtonClicked(DataDictionary dataItem)
-        {
-            if (dataItem == null) return;
-
-            M2922_InventoryItem item = (M2922_InventoryItem)dataItem[ID_ITEM].Reference;
-            if (item != null) _RequestItemSpawn(item);
         }
 
 #if !COMPILER_UDONSHARP && UNITY_EDITOR
