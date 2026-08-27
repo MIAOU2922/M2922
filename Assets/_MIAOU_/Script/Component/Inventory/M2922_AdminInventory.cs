@@ -35,9 +35,9 @@ namespace M2922.Component.Inventory
     /// PERF : hérite du tickable de M2922_Inventory (touche I + distance) ;
     /// le refresh de statuts ne tourne que lorsque le menu est ouvert.
     /// </summary>
-    [AddComponentMenu("M2922/Inventory/Map Item Menu")]
+    [AddComponentMenu("M2922/Inventory/Admin Inventory")]
     [UdonBehaviourSyncMode(BehaviourSyncMode.None)]
-    public class M2922_MapItemMenu : M2922_Inventory
+    public class M2922_AdminInventory : M2922_Inventory
     {
         private const int MAX_RETRIES = 5;
         private const int STATUS_REFRESH_FRAMES = 60;
@@ -55,6 +55,11 @@ namespace M2922.Component.Inventory
         private int _pendingHideRetries = 0;
         private M2922_InventoryItem _pendingSpawnItem;
         private int _pendingSpawnRetries = 0;
+        // Curseur de rotation du stack : garantit de parcourir TOUS les
+        // exemplaires du stack à chaque spawn successif, même si Active ne
+        // reflète pas l'état réel (bug réseau / ClientSim).
+        private int _spawnCursor = 0;
+        private int _cursorStackIndex = -1;
 
         private bool _built = false;
         private int _statusRefreshCounter = 0;
@@ -119,13 +124,56 @@ namespace M2922.Component.Inventory
         {
             if (_selectedItem == null) return;
 
-            DataList stack = _selectedItem[ID_STACK].DataList;
+            DataList stack = _GetStackFromEntry(_selectedItem);
             if (stack == null || stack.Count == 0) return;
 
-            // LIFO : spawn le dernier item du stack sélectionné (reste en liste).
-            M2922_InventoryItem item = (M2922_InventoryItem)stack[stack.Count - 1].Reference;
+            // Reset le curseur quand on change de stack sélectionné.
+            int stackIndex = ItemList.IndexOf(_selectedItem);
+            if (stackIndex != _cursorStackIndex)
+            {
+                _cursorStackIndex = stackIndex;
+                _spawnCursor = 0;
+            }
+
+            int start = _spawnCursor % stack.Count;
+
+            // PASS 1 : premier item NON actif À PARTIR du curseur (sans boucler —
+            // les items avant le curseur seront atteints à la rotation suivante).
+            M2922_InventoryItem item = null;
+            for (int i = start; i < stack.Count; i++)
+            {
+                M2922_InventoryItem candidate = (M2922_InventoryItem)stack[i].Reference;
+                if (candidate == null) continue;
+                if (!candidate._IsActive())
+                {
+                    item = candidate;
+                    _spawnCursor = i + 1;
+                    break;
+                }
+            }
+
+            // PASS 2 : rien d'inactif après le curseur → respawn le suivant et
+            // AVANCE le curseur (garantit de parcourir tous les exemplaires).
+            if (item == null)
+            {
+                for (int offset = 0; offset < stack.Count; offset++)
+                {
+                    int i = (start + offset) % stack.Count;
+                    item = (M2922_InventoryItem)stack[i].Reference;
+                    if (item != null)
+                    {
+                        _spawnCursor = i + 1;
+                        break;
+                    }
+                }
+            }
             if (item == null) return;
 
+            this.Log($"[MapItemMenu] Spawn de '{item.name}' (curseur {_spawnCursor - 1}/{stack.Count}, Active={item._IsActive()}).");
+
+            // Spawn EXACTEMENT au SpawnPoint : l'étalement vient de la
+            // libération kinematic 5 s après le spawn (items non-kinematic
+            // par défaut qui retombent physiquement).
             _RequestItemSpawn(item);
         }
 
@@ -179,7 +227,7 @@ namespace M2922.Component.Inventory
             if (Networking.IsOwner(item.gameObject))
             {
                 item._SetWorldStored(false);
-                item._Spawn(SpawnPoint != null ? SpawnPoint : transform);
+                SpawnAt(item);
                 _RefreshStatuses();
                 return;
             }
@@ -188,6 +236,15 @@ namespace M2922.Component.Inventory
             _pendingSpawnRetries = 0;
             Networking.SetOwner(_localPlayer, item.gameObject);
             SendCustomEventDelayedSeconds("_TrySpawnPendingItem", 1f);
+        }
+
+        /// <summary>Spawn l'item EXACTEMENT au SpawnPoint (ou sur le menu).</summary>
+        private void SpawnAt(M2922_InventoryItem item)
+        {
+            Vector3 pos = SpawnPoint != null ? SpawnPoint.position : transform.position;
+            Quaternion rot = SpawnPoint != null ? SpawnPoint.rotation : transform.rotation;
+            item._SpawnAt(pos, rot);
+            this.Log($"[MapItemMenu] SpawnAt '{item.name}' pos={pos} Active après spawn={item._IsActive()}");
         }
 
         /// <summary>Retry différé du spawn (tant que l'ownership de l'item n'est pas effective).</summary>
@@ -200,7 +257,7 @@ namespace M2922.Component.Inventory
                 M2922_InventoryItem item = _pendingSpawnItem;
                 _pendingSpawnItem = null;
                 item._SetWorldStored(false);
-                item._Spawn(SpawnPoint != null ? SpawnPoint : transform);
+                SpawnAt(item);
                 _RefreshStatuses();
                 return;
             }
@@ -241,7 +298,7 @@ namespace M2922.Component.Inventory
             // Nettoyer la liste locale (boutons + données).
             for (int i = 0; i < ItemList.Count; i++)
             {
-                GameObject button = (GameObject)ItemList[i].DataDictionary[ID_BUTTON].Reference;
+                GameObject button = _GetButtonFromEntry(ItemList[i].DataDictionary);
                 if (button != null) Destroy(button);
             }
             ItemList.Clear();
@@ -281,7 +338,7 @@ namespace M2922.Component.Inventory
             for (int i = 0; i < ItemList.Count; i++)
             {
                 DataDictionary entry = ItemList[i].DataDictionary;
-                DataList stack = entry[ID_STACK].DataList;
+                DataList stack = _GetStackFromEntry(entry);
                 if (stack == null) continue;
 
                 bool anyActive = false;
@@ -298,7 +355,7 @@ namespace M2922.Component.Inventory
                     }
                 }
 
-                GameObject buttonObj = (GameObject)entry[ID_BUTTON].Reference;
+                GameObject buttonObj = _GetButtonFromEntry(entry);
                 if (buttonObj == null) continue;
 
                 M2922_InventoryButtonUI button = buttonObj.GetComponent<M2922_InventoryButtonUI>();
@@ -316,10 +373,15 @@ namespace M2922.Component.Inventory
             if (stackIndex >= 0)
             {
                 DataDictionary entry = ItemList[stackIndex].DataDictionary;
-                DataList stack = entry[ID_STACK].DataList;
-                stack.Add(item);
-                _RefreshButtonCount(entry);
-                return;
+                DataList stack = _GetStackFromEntry(entry);
+                if (stack != null)
+                {
+                    stack.Add(item);
+                    _RefreshButtonCount(entry);
+                    return;
+                }
+                // Entrée corrompue (reliquat sérialisé) : retirée avant d'en créer une nouvelle.
+                ItemList.RemoveAt(stackIndex);
             }
 
             DataList newStack = new DataList();
@@ -384,7 +446,7 @@ namespace M2922.Component.Inventory
             int active = 0;
             for (int i = 0; i < ItemList.Count; i++)
             {
-                DataList stack = ItemList[i].DataDictionary[ID_STACK].DataList;
+                DataList stack = _GetStackFromEntry(ItemList[i].DataDictionary);
                 if (stack == null) continue;
                 for (int j = 0; j < stack.Count; j++)
                 {

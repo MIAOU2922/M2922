@@ -1,5 +1,6 @@
 using UdonSharp;
 using UnityEngine;
+using VRC.SDK3.Components;
 using VRC.SDKBase;
 using VRC.Udon;
 using M2922.Core;
@@ -80,6 +81,8 @@ namespace M2922.Component.Weapon
         [SerializeField] private int _poolSize = 10;
         private M2922_Projectile[] _pool;
         private int _poolIndex = 0;
+        /// <summary>Conteneur commun des projectiles de pool (objet racine « Projectil Pool »).</summary>
+        private Transform _projectilePoolParent;
 
         [Header("=== PROJECTILE CONFIG ===")]
         [Tooltip("Déclencheur d'explosion (Default = défaut par type d'arme).")]
@@ -98,6 +101,11 @@ namespace M2922.Component.Weapon
         [Header("=== RELOAD ===")]
         [Tooltip("Rechargement automatique quand le chargeur est vide.")]
         [SerializeField] private bool _autoReload = true;
+
+        [Header("=== GRAB (collider) ===")]
+        [Tooltip("Collider désactivé tant que l'arme est tenue (auto-détecté : collider du VRCPickup).")]
+        [SerializeField] private Collider _grabCollider;
+        private bool _grabColliderDefaultEnabled = true;
 
         [Header("=== MELEE ===")]
         [SerializeField] private float _meleeRange = 2f;
@@ -151,6 +159,8 @@ namespace M2922.Component.Weapon
         private FireMode _fireMode;
         private bool _useHitscan;
         private bool _useProjectile;
+        /// <summary>True quand Start a terminé (anti-replay de désérialisation pré-Start).</summary>
+        private bool _started = false;
 
         // --- NETWORK FIRE VFX ---
         [UdonSynced] private int _fireTick = 0;
@@ -219,6 +229,20 @@ namespace M2922.Component.Weapon
             if (_audioSource == null)
                 _audioSource = GetComponent<AudioSource>();
 
+            // Collider de grab : auto-détecté depuis le VRCPickup (désactivé
+            // tant que l'arme est tenue pour éviter les collisions physiques).
+            if (_grabCollider == null)
+            {
+                VRCPickup pickup = GetComponentInParent<VRCPickup>();
+                if (pickup != null)
+                {
+                    _grabCollider = pickup.GetComponent<Collider>();
+                    if (_grabCollider == null)
+                        _grabCollider = pickup.GetComponentInChildren<Collider>(true);
+                }
+            }
+            _grabColliderDefaultEnabled = _grabCollider != null && _grabCollider.enabled;
+
             _weaponType = (WeaponType)_weapon.WeaponTypeAsInt;
             _fireMode = FireModeMapping.GetFireMode(_weaponType);
             _useHitscan = FireModeMapping.UseHitscan(_weaponType);
@@ -243,24 +267,94 @@ namespace M2922.Component.Weapon
             ComputeRecoilStats();
             CaptureRecoilOrigin();
 
+            // Première activation : aligne les compteurs de désérialisation
+            // sur l'état synchronisé (anti tir fantôme au spawn).
+            ResyncReplayCounters();
+
+            // Marque la fin du Start : les désérialisations qui arrivaient AVANT
+            // (activation de l'item → replay du dernier état synchronisé) sont
+            // ignorées — anti particules/tirs fantômes au spawn.
+            _started = true;
+
             this.Log("FireHandler pret. Mode=" + _fireMode.ToString()
                 + " RPM=" + rpm.ToString()
                 + " Hitscan=" + _useHitscan.ToString()
                 + " Projectile=" + _useProjectile.ToString());
         }
 
+        /// <summary>
+        /// ⚠ Pas de OnEnable dans l'UdonSharp vendu avec com.vrchat.worlds :
+        /// on détecte les RÉACTIVATIONS dans Update via l'écart de temps.
+        /// Pendant que le sous-arbre est DÉSACTIVÉ (item rangé / en pool),
+        /// Update ne tourne pas → au retour, l'écart est anormalement grand.
+        /// On resynchronise alors les compteurs de désérialisation pour que le
+        /// premier OnDeserialization ne rejoue PAS le DERNIER tir (son +
+        /// muzzle flash + projectile visuel + relay de dégâts) → tir fantôme
+        /// au spawn, pour les rockets comme pour les hitscan.
+        /// Un resync « faux positif » (pause menu / chargement) est sans effet :
+        /// aligner les compteurs sur l'état actuel ne perd aucun tir réel.
+        /// </summary>
+        private void ResyncReplayCounters()
+        {
+            _lastFireTick = _fireTick;
+            _lastProjectileFireTick = _projectileFireTick;
+            _lastRelaySeq = _relaySequence;
+            _relayDamage = 0f;
+        }
+
         private void InitProjectilePool()
         {
             _pool = new M2922_Projectile[_poolSize];
+
+            // Conteneur commun : tous les projectiles de pool deviennent
+            // enfants de l'objet racine « Projectil Pool » (hiérarchie propre).
+            Transform poolParent = GetOrFindProjectilePoolParent();
+
             for (int i = 0; i < _poolSize; i++)
             {
                 GameObject obj = Instantiate(_projectilePrefab);
-                // Détacher du weapon pour que les projectiles inactifs ne suivent pas l'arme
-                obj.transform.SetParent(null);
-                obj.transform.position = Vector3.zero;
+                // Détacher du weapon (les projectiles inactifs ne suivent pas
+                // l'arme) en les rangeant sous « Projectil Pool ».
+                obj.transform.SetParent(poolParent);
+                obj.transform.localPosition = Vector3.zero;
+                obj.transform.localRotation = Quaternion.identity;
                 obj.SetActive(false);
                 _pool[i] = obj.GetComponent<M2922_Projectile>();
             }
+        }
+
+        /// <summary>
+        /// Retrouve le conteneur des projectiles de pool (mis en cache) :
+        /// 1. « Projectil Pool » (créé au bake / play mode par l'éditeur) ;
+        /// 2. fallback « Manager » (toujours présent dans les scènes M2922) ;
+        /// 3. sinon null → projectiles à la racine de scène.
+        /// ⚠ Udon ne permet PAS de créer un GameObject vide au runtime
+        /// (pas de new GameObject() dans l'UdonSharp vendu avec com.vrchat.worlds) :
+        /// l'objet dédié est créé dans la scène par l'éditeur
+        /// (M2922_ItemSpawnerGenerator.EnsureProjectilePoolContainer).
+        /// </summary>
+        private Transform GetOrFindProjectilePoolParent()
+        {
+            if (_projectilePoolParent != null) return _projectilePoolParent;
+
+            GameObject container = GameObject.Find("Projectil Pool");
+            if (container == null)
+            {
+                // Fallback : le Manager (objet statique toujours présent).
+                container = GameObject.Find("Manager");
+                if (container != null)
+                {
+                    this.Warning("[FireHandler] 'Projectil Pool' introuvable : projectiles sous 'Manager' (re-bakez la pool d'items pour créer le conteneur dédié).");
+                }
+                else
+                {
+                    this.Warning("[FireHandler] 'Projectil Pool' et 'Manager' introuvables : projectiles placés à la racine de la scène.");
+                    return null;
+                }
+            }
+
+            _projectilePoolParent = container.transform;
+            return _projectilePoolParent;
         }
 
         // ===================================================
@@ -312,7 +406,15 @@ namespace M2922.Component.Weapon
             _lastFireTick = 0;
             _projectileFireTick = 0;
             _lastProjectileFireTick = 0;
+            // Relay de dégâts : resynchronise aussi (sinon l'état rejoué à la
+            // prise en main réappliquerait le DERNIER relai de dégâts).
+            _lastRelaySeq = _relaySequence;
+            _relayDamage = 0f;
             RequestSerialization();
+
+            // Arme tenue : on désactive son collider (pas de collision physique
+            // avec le monde / les joueurs pendant la prise en main).
+            if (_grabCollider != null) _grabCollider.enabled = false;
 
             this.Log($"[FireHandler] HandlePickup — localPlayer={(_localPlayer != null ? _localPlayer.displayName : "NULL")}, wasOwner={wasOwner}, isOwnerNow={Networking.IsOwner(gameObject)}");
         }
@@ -324,6 +426,9 @@ namespace M2922.Component.Weapon
             _isCharging = false;
             if (_beamRenderer != null) _beamRenderer.enabled = false;
             _beamActive = false;
+
+            // Arme lâchée : on réactive son collider.
+            if (_grabCollider != null) _grabCollider.enabled = _grabColliderDefaultEnabled;
 
             // Reset recul
             ResetRecoil();
@@ -367,8 +472,22 @@ namespace M2922.Component.Weapon
         // UPDATE
         // ===================================================
 
+        private const float REACTIVATION_GAP_SECONDS = 0.5f;
+        private float _lastUpdateTime = -1f;
+
         private void Update()
         {
+            // Détection de réactivation (sous-arbre désactivé puis réactivé) :
+            // écart de temps anormal entre deux Update → resynchronise les
+            // compteurs de désérialisation (anti tir fantôme au spawn).
+            float now = Time.time;
+            if (_lastUpdateTime < 0f || now < _lastUpdateTime ||
+                now - _lastUpdateTime > REACTIVATION_GAP_SECONDS)
+            {
+                ResyncReplayCounters();
+            }
+            _lastUpdateTime = now;
+
             if (_weapon == null) return;
 
             if (_fireCooldown > 0f)
@@ -868,6 +987,15 @@ namespace M2922.Component.Weapon
 
         public override void OnDeserialization()
         {
+            // ⚠ Anti tir fantôme au spawn : une désérialisation qui arrive AVANT
+            // la fin du Start (item qui vient d'être activé, late joiner, ou
+            // ClientSim) rejoue le DERNIER état synchronisé (_fireTick périmé →
+            // muzzle flash + son + projectile visuel = « toutes les particules
+            // de tir se tirent au spawn »). Tant que Start n'a pas terminé, on
+            // ignore TOUT replay — les compteurs sont resynchronisés dans Start
+            // (ResyncReplayCounters).
+            if (!_started) return;
+
             // --- VFX : muzzle flash pour les autres joueurs ---
             if (_fireTick != _lastFireTick && _fireTick > 0)
             {

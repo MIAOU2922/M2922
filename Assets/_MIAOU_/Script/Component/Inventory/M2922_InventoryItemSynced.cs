@@ -108,11 +108,15 @@ namespace M2922.Component.Inventory
 
         public override void _Spawn(Transform point)
         {
-            JustSpawned = true;
-            Pickup.transform.SetPositionAndRotation(point.position, point.rotation);
-            _SetVisualActive(true);
-            if (_rigidbody != null) _rigidbody.isKinematic = true;
+            _SpawnAt(point.position, point.rotation);
+        }
 
+        public override void _SpawnAt(Vector3 position, Quaternion rotation)
+        {
+            // Position + activation + kinematic + délai de libération (base).
+            base._SpawnAt(position, rotation);
+
+            _SetVisualActive(true);
             Active = true;
             if (_objectSync != null)
             {
@@ -120,6 +124,14 @@ namespace M2922.Component.Inventory
                 _objectSync.FlagDiscontinuity();
             }
             RequestSerialization();
+        }
+
+        public override void _ReleaseKinematicAfterSpawn()
+        {
+            if (_startsKinematic) return;
+            // VRCObjectSync propage l'état kinematic aux autres clients.
+            if (_objectSync != null) _objectSync.SetKinematic(false);
+            if (_rigidbody != null) _rigidbody.isKinematic = false;
         }
 
         public override void _Hide()
@@ -157,8 +169,10 @@ namespace M2922.Component.Inventory
 
         public override void _OnStartHidden()
         {
-            // Pool : marqué comme "rangé" pour éviter l'auto-respawn à la
-            // déconnexion du propriétaire, puis masqué.
+            // Pool : marqué comme « rangé » pour éviter l'auto-respawn à la
+            // déconnexion du propriétaire, puis masqué. Les scripts enfants du
+            // sous-arbre pickup initialisent leur Start au premier spawn
+            // (première activation du GameObject) — pas de pulse d'init.
             _SetWorldStored(true);
             _Hide();
         }

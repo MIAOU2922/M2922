@@ -206,10 +206,33 @@ namespace M2922.Component.Inventory
         /// <summary>Fait réapparaître l'objet au point donné (kinematic, prêt à être ramassé).</summary>
         public virtual void _Spawn(Transform point)
         {
+            _SpawnAt(point.position, point.rotation);
+        }
+
+        /// <summary>Fait réapparaître l'objet à une position/rotation données (kinematic, prêt à être ramassé).</summary>
+        public virtual void _SpawnAt(Vector3 position, Quaternion rotation)
+        {
             JustSpawned = true;
-            Pickup.transform.SetPositionAndRotation(point.position, point.rotation);
+            Pickup.transform.SetPositionAndRotation(position, rotation);
             _pickupObj.SetActive(true);
             if (_rigidbody != null) _rigidbody.isKinematic = true;
+
+            // Item NON kinematic par défaut : libéré de l'état kinematic 5 s
+            // après le spawn (retombe physiquement), quoi qu'il se passe.
+            if (!_startsKinematic)
+                SendCustomEventDelayedSeconds("_ReleaseKinematicAfterSpawn", 5f);
+        }
+
+        /// <summary>
+        /// Libère l'état kinematic 5 s après un spawn, SI l'item n'est pas
+        /// kinematic par défaut (_startsKinematic capturé au Start). No-op
+        /// pour les items kinematic par défaut. Virtual : la version synced
+        /// passe par VRCObjectSync pour propager l'état aux autres clients.
+        /// </summary>
+        public virtual void _ReleaseKinematicAfterSpawn()
+        {
+            if (_startsKinematic) return;
+            if (_rigidbody != null) _rigidbody.isKinematic = false;
         }
 
         /// <summary>Range l'objet : drop le pickup, désactive le GameObject et fige la physique.</summary>
@@ -231,7 +254,15 @@ namespace M2922.Component.Inventory
             if (_rigidbody != null) _rigidbody.isKinematic = _startsKinematic;
         }
 
-        /// <summary>Appelé au Start si l'item démarre masqué (pool). Surchargé par la version synced.</summary>
+        /// <summary>
+        /// Appelé au Start si l'item démarre masqué (pool) : masque l'objet.
+        /// ⚠ Les scripts enfants du sous-arbre pickup (armes, pools de
+        /// projectiles...) exécuteront leur Start à la PREMIÈRE ACTIVATION,
+        /// c'est-à-dire au premier spawn : Unity déclenche Start quand le
+        /// GameObject devient actif pour la première fois — aucun pré-spawn
+        /// ni pulse d'init n'est nécessaire.
+        /// Surchargé par la version synced (marquage « rangé » en plus).
+        /// </summary>
         public virtual void _OnStartHidden()
         {
             _Hide();

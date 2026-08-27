@@ -103,11 +103,12 @@ namespace M2922.Component.Inventory
         {
             if (_selectedItem == null) return;
 
-            DataList stack = _selectedItem[ID_STACK].DataList;
+            DataList stack = _GetStackFromEntry(_selectedItem);
             if (stack == null || stack.Count == 0) return;
 
             // LIFO : retire un exemplaire du stack sélectionné.
             M2922_InventoryItem item = (M2922_InventoryItem)stack[stack.Count - 1].Reference;
+            if (item == null) return;
             _RequestAction("REMOVE:" + item.Key);
         }
 
@@ -374,14 +375,14 @@ namespace M2922.Component.Inventory
             string selectedKey = "";
             if (_selectedItem != null)
             {
-                M2922_InventoryItem sel = (M2922_InventoryItem)_selectedItem[ID_ITEM].Reference;
+                M2922_InventoryItem sel = _GetItemFromEntry(_selectedItem);
                 if (sel != null) selectedKey = sel.Key;
             }
 
             // Nettoyer la liste locale (boutons + données).
             for (int i = 0; i < ItemList.Count; i++)
             {
-                GameObject button = (GameObject)ItemList[i].DataDictionary[ID_BUTTON].Reference;
+                GameObject button = _GetButtonFromEntry(ItemList[i].DataDictionary);
                 if (button != null) Destroy(button);
             }
             ItemList.Clear();
@@ -412,10 +413,15 @@ namespace M2922.Component.Inventory
             if (stackIndex >= 0)
             {
                 DataDictionary entry = ItemList[stackIndex].DataDictionary;
-                DataList stack = entry[ID_STACK].DataList;
-                stack.Add(item);
-                _RefreshButtonCount(entry);
-                return;
+                DataList stack = _GetStackFromEntry(entry);
+                if (stack != null)
+                {
+                    stack.Add(item);
+                    _RefreshButtonCount(entry);
+                    return;
+                }
+                // Entrée corrompue (reliquat sérialisé) : retirée avant d'en créer une nouvelle.
+                ItemList.RemoveAt(stackIndex);
             }
 
             DataList newStack = new DataList();
@@ -443,7 +449,7 @@ namespace M2922.Component.Inventory
                 for (int i = 0; i < ItemList.Count; i++)
                 {
                     DataDictionary entry = ItemList[i].DataDictionary;
-                    DataList stack = entry[ID_STACK].DataList;
+                    DataList stack = _GetStackFromEntry(entry);
                     if (stack == null) continue;
 
                     for (int j = 0; j < stack.Count; j++)

@@ -523,6 +523,50 @@ namespace M2922.Component.Inventory
             if (button != null) button._RefreshCount(_GetStackCount(entry));
         }
 
+        // ============================================================
+        // DATA TOKEN HELPERS (anti-crash KeyDoesNotExist)
+        // ============================================================
+
+        /// <summary>
+        /// Item d'une entrée de liste (null si entrée nulle / clé absente /
+        /// token non-Reference). ⚠ Un indexeur `entry[key].Reference` sur une
+        /// clé ABSENTE retourne un token Error : y accéder HALT le
+        /// UdonBehaviour (crash KeyDoesNotExist) — toujours passer par ces
+        /// helpers pour les reliquats sérialisés.
+        /// </summary>
+        protected M2922_InventoryItem _GetItemFromEntry(DataDictionary entry)
+        {
+            if (entry == null) return null;
+            if (!entry.TryGetValue(ID_ITEM, out DataToken token)) return null;
+            if (token.TokenType != TokenType.Reference) return null;
+            return (M2922_InventoryItem)token.Reference;
+        }
+
+        /// <summary>Stack (DataList) d'une entrée de liste (null si invalide).</summary>
+        protected DataList _GetStackFromEntry(DataDictionary entry)
+        {
+            if (entry == null) return null;
+            if (!entry.TryGetValue(ID_STACK, out DataToken token)) return null;
+            if (token.TokenType != TokenType.DataList) return null;
+            return token.DataList;
+        }
+
+        /// <summary>GameObject bouton d'une entrée de liste (null si invalide).</summary>
+        protected GameObject _GetButtonFromEntry(DataDictionary entry)
+        {
+            if (entry == null) return null;
+            if (!entry.TryGetValue(ID_BUTTON, out DataToken token)) return null;
+            if (token.TokenType != TokenType.Reference) return null;
+            return (GameObject)token.Reference;
+        }
+
+        /// <summary>Item pointé par le DataItem d'un bouton (null si invalide).</summary>
+        protected M2922_InventoryItem _GetItemFromButton(M2922_InventoryButtonUI button)
+        {
+            if (button == null || button.DataItem == null) return null;
+            return _GetItemFromEntry(button.DataItem);
+        }
+
         /// <summary>Retire un item de son stack ; détruit le stack s'il devient vide.</summary>
         protected void _RemoveItemFromStack(int stackIndex, M2922_InventoryItem item)
         {

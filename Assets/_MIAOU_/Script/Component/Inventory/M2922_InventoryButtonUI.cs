@@ -45,13 +45,25 @@ namespace M2922.Component.Inventory
         {
             Inventory = inventory;
             DataItem = dataItem;
+            if (dataItem == null) return;
 
-            M2922_InventoryItem item = (M2922_InventoryItem)dataItem[M2922_Inventory.ID_ITEM].Reference;
+            DataToken itemToken;
+            if (!dataItem.TryGetValue(M2922_Inventory.ID_ITEM, out itemToken) || itemToken.TokenType != TokenType.Reference)
+            {
+                this.Warning("[ButtonUI] _Init ignoré : entrée sans item valide.");
+                return;
+            }
+
+            M2922_InventoryItem item = (M2922_InventoryItem)itemToken.Reference;
 
             if (ItemName != null) ItemName.text = item.ItemName;
             if (ItemIcon != null) ItemIcon.sprite = item.Icon;
 
-            DataList stack = dataItem[M2922_Inventory.ID_STACK].DataList;
+            DataToken stackToken;
+            DataList stack = null;
+            if (dataItem.TryGetValue(M2922_Inventory.ID_STACK, out stackToken) && stackToken.TokenType == TokenType.DataList)
+                stack = stackToken.DataList;
+
             _RefreshCount(stack != null ? stack.Count : 1);
         }
 
